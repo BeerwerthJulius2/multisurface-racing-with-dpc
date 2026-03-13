@@ -9,6 +9,8 @@ import time
 import gc
 from dataclasses import dataclass, field
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 np.set_printoptions(precision=4, suppress=True)
 
 
@@ -190,7 +192,7 @@ class GPEnsembleModelFrenet:
         lower = np.zeros((batch_size, 3))
         upper = np.zeros((batch_size, 3))
 
-        gp_states = torch.tensor(np.vstack((state_vec[[2, 4, 5, 6], :], control_vec)).T, dtype=torch.float, device=torch.device('cuda'))
+        gp_states = torch.tensor(np.vstack((state_vec[[2, 4, 5, 6], :], control_vec)).T, dtype=torch.float, device=DEVICE)
         if self.trained:
             with torch.no_grad(), gpytorch.settings.fast_pred_var():
                 def batch_jacobian(f, x):
@@ -312,7 +314,7 @@ class GPEnsembleModelFrenet:
             with torch.no_grad(), gpytorch.settings.fast_pred_var():
                 jac = jacobian(fun, torch.tensor(
                     [[float(vx), float(vy), float(yaw_rate), float(steering_angle), float(Fxr),
-                      float(delta_v)]]).cuda()).squeeze()
+                      float(delta_v)]]).to(DEVICE)).squeeze()
 
                 mean, lower, upper = self.scale_and_predict_model_step(state, control_input)
 
@@ -444,7 +446,7 @@ class GPEnsembleModelFrenet:
                                            self.scaler_x[3].transform(state[6]),
                                            self.scaler_x[4].transform(control_input[0]),  # control_input[0, i - 1]
                                            self.scaler_x[5].transform(control_input[1]),
-                                           ], dtype=numpy.float32)).reshape((-1, 6)).cuda()
+                                           ], dtype=numpy.float32)).reshape((-1, 6)).to(DEVICE)
 
         mean, lower, upper = self.predict_model_step(point)
         if len(lower.shape) == 1:
@@ -526,26 +528,26 @@ class GPEnsembleModelFrenet:
                                                        self.scaler_x[2].fit_transform(train_x[2]),
                                                        self.scaler_x[3].fit_transform(train_x[3]),
                                                        self.scaler_x[4].fit_transform(train_x[4]),
-                                                       self.scaler_x[5].fit_transform(train_x[5]),)), 0, 1).cuda()
+                                                       self.scaler_x[5].fit_transform(train_x[5]),)), 0, 1).to(DEVICE)
 
         train_y_scaled = torch.transpose(torch.vstack((self.scaler_y[0].fit_transform(train_y[0]),
                                                        self.scaler_y[1].fit_transform(train_y[1]),
-                                                       self.scaler_y[2].fit_transform(train_y[2]),)), 0, 1).cuda()
+                                                       self.scaler_y[2].fit_transform(train_y[2]),)), 0, 1).to(DEVICE)
 
         self.gp_likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=3)
         self.gp_model = BatchIndependentMultitaskGPModel(train_x_scaled, train_y_scaled, self.gp_likelihood)
 
         self.means = torch.tensor([[self.scaler_x[0].mean, self.scaler_x[1].mean, self.scaler_x[2].mean,
-                                    self.scaler_x[3].mean, self.scaler_x[4].mean, self.scaler_x[5].mean]], device=torch.device('cuda'))
+                                    self.scaler_x[3].mean, self.scaler_x[4].mean, self.scaler_x[5].mean]], device=DEVICE)
 
         self.std = torch.tensor([[self.scaler_x[0].std, self.scaler_x[1].std, self.scaler_x[2].std,
-                                  self.scaler_x[3].std, self.scaler_x[4].std, self.scaler_x[5].std]], device=torch.device('cuda'))
+                                  self.scaler_x[3].std, self.scaler_x[4].std, self.scaler_x[5].std]], device=DEVICE)
 
         return train_x_scaled, train_y_scaled
 
     def cuda(self):
-        self.gp_model.cuda()
-        self.gp_likelihood.cuda()
+        self.gp_model.to(DEVICE)
+        self.gp_likelihood.to(DEVICE)
 
     def eval(self):
         self.trained = True
@@ -553,8 +555,8 @@ class GPEnsembleModelFrenet:
         self.gp_likelihood.eval()
 
     def train_gp(self, train_x_scaled, train_y_scaled, method=0):
-        self.gp_model = self.gp_model.cuda()
-        self.gp_likelihood = self.gp_likelihood.cuda()
+        self.gp_model = self.gp_model.to(DEVICE)
+        self.gp_likelihood = self.gp_likelihood.to(DEVICE)
 
         if method == 0:
             training_iterations = 300
@@ -674,11 +676,11 @@ class GPEnsembleModelFrenet:
                                                                 self.scaler_x[2].fit_transform(train_x[2]),
                                                                 self.scaler_x[3].fit_transform(train_x[3]),
                                                                 self.scaler_x[4].fit_transform(train_x[4]),
-                                                                self.scaler_x[5].fit_transform(train_x[5]),)), 0, 1).cuda()
+                                                                self.scaler_x[5].fit_transform(train_x[5]),)), 0, 1).to(DEVICE)
 
             self.train_y_scaled = torch.transpose(torch.vstack((self.scaler_y[0].fit_transform(train_y[0]),
                                                                 self.scaler_y[1].fit_transform(train_y[1]),
-                                                                self.scaler_y[2].fit_transform(train_y[2]),)), 0, 1).cuda()
+                                                                self.scaler_y[2].fit_transform(train_y[2]),)), 0, 1).to(DEVICE)
 
             if self.gp_likelihood is not None:
                 self.gp_likelihood.cpu()
@@ -706,7 +708,7 @@ class GPEnsembleModelFrenet:
                 gc.collect()
                 torch.cuda.empty_cache()
             self.means = torch.tensor([[self.scaler_x[0].mean, self.scaler_x[1].mean, self.scaler_x[2].mean,
-                                        self.scaler_x[3].mean, self.scaler_x[4].mean, self.scaler_x[5].mean]], device=torch.device('cuda'))
+                                        self.scaler_x[3].mean, self.scaler_x[4].mean, self.scaler_x[5].mean]], device=DEVICE)
 
             if self.std is not None:
                 self.std.cpu()
@@ -714,10 +716,10 @@ class GPEnsembleModelFrenet:
                 gc.collect()
                 torch.cuda.empty_cache()
             self.std = torch.tensor([[self.scaler_x[0].std, self.scaler_x[1].std, self.scaler_x[2].std,
-                                      self.scaler_x[3].std, self.scaler_x[4].std, self.scaler_x[5].std]], device=torch.device('cuda'))
+                                      self.scaler_x[3].std, self.scaler_x[4].std, self.scaler_x[5].std]], device=DEVICE)
 
-            self.gp_model = self.gp_model.cuda()
-            self.gp_likelihood = self.gp_likelihood.cuda()
+            self.gp_model = self.gp_model.to(DEVICE)
+            self.gp_likelihood = self.gp_likelihood.to(DEVICE)
 
             if st_model is not None and st_like is not None:
                 training_iterations = 1
