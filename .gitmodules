@@ -1,0 +1,6 @@
+[submodule "external/dpc"]
+	path = external/dpc
+	url = git@git.rwth-aachen.de:CPM/Project/julius/software/deepc.git
+[submodule "external/nmpc"]
+	path = external/nmpc
+	url = git@github.com:TUM-AVS/TUM-CONTROL.git
