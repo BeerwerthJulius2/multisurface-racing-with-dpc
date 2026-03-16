@@ -159,6 +159,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     constant_speed = False
     constant_speed_value = 8.0
     velocity_profile_multiplier = 1.0
+    velocity_profile_max = 20.0
     number_of_laps = 5
     start_point = 1  # index on the trajectory to start from
     initialization_horizon = 5
@@ -212,6 +213,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         waypoints[:, 5] = np.ones((waypoints[:, 5].shape[0],)) * constant_speed_value
     else:
         waypoints[:, 5] *= velocity_profile_multiplier
+        waypoints[:, 5] = np.clip(waypoints[:, 5], 0.0, velocity_profile_max)
 
     initial_inputs = deque(maxlen=initialization_horizon)
     initial_outputs = deque(maxlen=initialization_horizon)
