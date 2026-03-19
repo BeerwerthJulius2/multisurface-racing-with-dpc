@@ -150,13 +150,13 @@ def main():  # after launching this you can run visualization.py to see the resu
     # YasMarina
     rotate_map = True  # !!!! If the car is spawning with bad orientation change value here !!!! TODO Fix here so this is not needed anymore
     use_dyn_friction = False
-    constant_friction = 0.5
+    constant_friction = 1.1
     control_step = 100.0  # ms
     render_every = 100  # render graphics every n simulation steps
     constant_speed = False
     constant_speed_value = 14.0
     velocity_profile_multiplier = 1.0
-    number_of_laps = 5
+    number_of_laps = 6
     start_point = 1  # index on the trajectory to start from
 
     ekin_config = MPCConfigEXT()
@@ -261,7 +261,8 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     # init logger
     #log = {'time': [], 'accl': [], 'steer': [], 'x': [], 'y': [], 'yaw': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'tracking_error': []}
-    log_rows = []
+    log_dpc = []
+    log_nmpc = []
 
     # calc number of sim steps per one control step
     num_of_sim_steps = int(control_step / (env.timestep * 1000.0))
@@ -269,7 +270,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     print('Model used: %s' % model_to_use)
     while not done:
-        velocity_profile_multiplier = (0.6 + 0.1 * obs['lap_counts'][0])
+        velocity_profile_multiplier = (0.5 + 0.1 * obs['lap_counts'][0])
         print(velocity_profile_multiplier)
         waypoints[:, 5] = velocity_profile*velocity_profile_multiplier
         # Regulator step MPC
@@ -388,7 +389,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         #print(obs['linear_vels_x'])
 
         # Logging
-        log_rows.append([
+        log_dpc.append([
             laptime,
             0,  # agent id
             u[0],  # accel
@@ -398,6 +399,18 @@ def main():  # after launching this you can run visualization.py to see the resu
             env.sim.agents[0].state[3],  # velocity
             env.sim.agents[0].state[4],  # yaw
         ])
+        log_nmpc.append([
+            laptime,
+            0,
+            u[0],  # accel
+            u[1],  # steering
+            env.sim.agents[0].state[0],  # x
+            env.sim.agents[0].state[1],  # y
+            env.sim.agents[0].state[4],  # yaw
+            env.sim.agents[0].state[3], # vx
+            env.sim.agents[0].state[10], # vy
+            env.sim.agents[0].state[5], # yaw rate
+        ])
 
 
 
@@ -405,18 +418,25 @@ def main():  # after launching this you can run visualization.py to see the resu
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
-    print('Number of timesteps', len(log_rows))
+    print('Number of timesteps', len(log_dpc))
 
-    log_array = np.array(log_rows, dtype=np.float64)
+    log_dpc_array = np.array(log_dpc, dtype=np.float64)
+    log_nmpc_array = np.array(log_nmpc, dtype=np.float64)
 
     # Save CSV
     with open(f'dpc_data_{constant_friction}.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "v", "yaw"])
-        writer.writerows(log_array)
+        writer.writerows(log_dpc_array)
+
+    with open(f'nmpc_data_{constant_friction}.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["t", "agent_id", "x", "y", "yaw", "vx", "vy", "yaw_rate"])
+        writer.writerows(log_nmpc_array)
 
     # Save NumPy
-    np.save(f'dpc_data_{constant_friction}.npy', log_array)
+    np.save(f'data/dpc_experiments/dpc_data_{constant_friction}.npy', log_dpc_array)
+    np.save(f'data/dpc_experiments/nmpc_data_{constant_friction}.npy', log_nmpc_array)
 
 
 if __name__ == '__main__':
