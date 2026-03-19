@@ -16,7 +16,7 @@ class NMPCAdapter:
         self.update_waypoints(waypoints)
 
         self.control_freq_hz = 10.
-        self.prediction_horizon = 10
+        self.prediction_horizon = 11
         self.last_acc = 0.0
 
         config_path = "external/nmpc/Config/"
@@ -45,9 +45,9 @@ class NMPCAdapter:
                           'ref_yaw':ref[3]}
 
         initial_state = np.array([
-            states[0],  # x
-            states[1],  # y
-            states[3],  # yaw
+            0.0,  # x
+            0.0,  # y
+            0.0,  # yaw
             states[2],  # vx
             states[4],  # vy
             states[5],  # yaw_rate
@@ -58,11 +58,23 @@ class NMPCAdapter:
 
         u, prediction, _ = self.vehicle_nmpc.solve(reference_traj)
 
+        yaw0 = states[3]
 
-        mpc_ref_path_x = ref[0]
-        mpc_ref_path_y = ref[1]
-        pred_x = prediction[:,0]
-        pred_y = prediction[:,1]
+        # rotation back to global
+        R = np.array([
+            [np.cos(yaw0), -np.sin(yaw0)],
+            [np.sin(yaw0), np.cos(yaw0)]
+        ])
+
+        # reference
+        ref_global = R @ np.vstack((ref[0], ref[1]))
+        mpc_ref_path_x = ref_global[0] + states[0]
+        mpc_ref_path_y = ref_global[1] + states[1]
+
+        # prediction
+        pred_global = R @ np.vstack((prediction[:, 0], prediction[:, 1]))
+        pred_x = pred_global[0] + states[0]
+        pred_y = pred_global[1] + states[1]
 
         dt = 1.0 / float(self.control_freq_hz)
         u[0] = last_acc + u[0] * dt
@@ -97,7 +109,8 @@ class NMPCAdapter:
 
         dt = 1.0 / float(self.control_freq_hz)
 
-        s_future = s0 + np.cumsum(np.ones(pred_h) * abs(v) * dt)
+        #s_future = s0 + np.cumsum(np.ones(pred_h) * abs(v) * dt)
+        s_future = s0 + np.arange(pred_h) * abs(v) * dt
 
         track_len = self._progress[-1]
         s_future = np.mod(s_future, track_len)
@@ -124,11 +137,11 @@ class NMPCAdapter:
         ref[1] = self._ref_y[idx] + tau * (self._ref_y[idx + 1] - self._ref_y[idx])
         ref[2] = self._ref_speed[idx] + tau * (self._ref_speed[idx + 1] - self._ref_speed[idx])
 
-        yaw_i = wrap_angle_pi(self._ref_yaw[idx])
-        yaw_ip1 = wrap_angle_pi(self._ref_yaw[idx + 1])
+        yaw_i = self._ref_yaw[idx]
+        yaw_ip1 = self._ref_yaw[idx + 1]
 
-        dyaw = wrap_angle_pi(yaw_ip1 - yaw_i)
-        ref[3] = wrap_angle_pi(yaw_i + tau * dyaw)
+        dyaw = np.arctan2(np.sin(yaw_ip1 - yaw_i), np.cos(yaw_ip1 - yaw_i))
+        ref[3] = np.mod(yaw_i + tau * dyaw, 2 * np.pi)
 
 
         # first step uses current speed
@@ -136,6 +149,21 @@ class NMPCAdapter:
 
         # remaining steps from speed differences
         ref[4,1:] = np.diff(ref[2]) / dt
+
+        yaw0 = last_output[3]
+
+        # --- position to local frame ---
+        dx = ref[0] - x
+        dy = ref[1] - y
+
+        ref[0] = np.cos(yaw0) * dx + np.sin(yaw0) * dy
+        ref[1] = -np.sin(yaw0) * dx + np.cos(yaw0) * dy
+
+        # --- yaw to local frame ---
+        ref[3] = np.arctan2(
+            np.sin(ref[3] - yaw0),
+            np.cos(ref[3] - yaw0)
+        )
 
         return ref, s0
 

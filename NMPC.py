@@ -158,12 +158,11 @@ def main():  # after launching this you can run visualization.py to see the resu
     control_step = 100.0  # ms
     render_every = 40  # render graphics every n simulation steps
     constant_speed = False
-    constant_speed_value = 8.0
+    constant_speed_value = 10.0
     velocity_profile_multiplier = 1.0
     velocity_profile_max = 20.0
-    number_of_laps = 5
+    number_of_laps = 10
     start_point = 1  # index on the trajectory to start from
-    initialization_horizon = 5
 
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
@@ -269,6 +268,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     laptime = 0.0
     start = time.time()
     last_render = 0
+    last_acc = 0.0
 
     # init logger
     log = {'time': [], 'x': [], 'y': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'tracking_error': []}
@@ -329,8 +329,8 @@ def main():  # after launching this you can run visualization.py to see the resu
             draw.predicted_traj_show = np.array([mpc_pred_x, mpc_pred_y]).T
 
         elif model_to_use == "nmpc":
-            last_acc = env.sim.agents[0].accel
             u, mpc_ref_path_x, mpc_ref_path_y, mpc_pred_x, mpc_pred_y, mpc_ox, mpc_oy = planner_nmpc.plan(states=vehicle_state, last_acc=last_acc)
+            last_acc = u[0]
             # draw predicted states and reference trajectory
             draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
             draw.predicted_traj_show = np.array([mpc_pred_x, mpc_pred_y]).T
@@ -392,7 +392,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         step_reward = 0.0
 
         for i in range(num_of_sim_steps):
-            obs, rew, done, info = env.step(np.array([[u[1], u[0]]]))
+            obs, rew, _, info = env.step(np.array([[u[1], u[0]]]))
             step_reward += rew
 
             # Rendering
