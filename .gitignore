@@ -1,60 +1,47 @@
-# Byte-compiled / optimized / DLL files
+# macOS
+.DS_Store
+
+# Python environments
+.venv/
+venv/
+ENV/
+env/
+.env/
+.Python
+
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+nosetests.xml
 
-# C extensions
+# Build artifacts and generated code
+c_generated_code/
+*.o
+*.d
 *.so
-*.pth
-*.png
+*.dylib
+*.lib
+*.obj
 
-# Distribution / packaging
-bin/
-build/
-develop-eggs/
-dist/
-eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+# Hydra and experiment runtime metadata
+**/.hydra/
+**/preprocessed/
+**/logs/
+**/stats/
+**/visualizations_analysis_*/
+outputs/single/tmp/
 
-# Installer logs
+# IDE/editor
+.vscode/
+.idea/
+
+# Misc
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-.tox/
-.coverage
-.cache
-nosetests.xml
-coverage.xml
-
-# Translations
-*.mo
-
-# Mr Developer
-.mr.developer.cfg
-.project
-.pydevproject
-
-# Rope
-.ropeproject
-
-# Django stuff:
-*.log
-*.pot
-
-# Sphinx documentation
-docs/_build/
-
-# Ignore vscode config folder
-.vscode/
-
-# Custom
-dataset*
-log*
-*test*
+.DS_Store
