@@ -157,9 +157,9 @@ def main():  # after launching this you can run visualization.py to see the resu
     control_step = 100.0  # ms
     render_every = 40  # render graphics every n simulation steps
     constant_speed = False
-    constant_speed_value = 8.0
+    constant_speed_value = 15.0
     velocity_profile_multiplier = 1.0
-    velocity_profile_max = 20.0
+    velocity_profile_max = 25.0
     number_of_laps = 5
     start_point = 1  # index on the trajectory to start from
     initialization_horizon = 5
@@ -262,7 +262,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     env.add_render_callback(render_callback)
     # init vector = [x,y,yaw,steering angle, velocity, yaw_rate, beta]
     obs, step_reward, done, info = env.reset(
-        np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, 8.0, 0.0, 0.0]]))
+        np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, waypoints[start_point, 5], 0.0, 0.0]]))
     env.render()
 
     laptime = 0.0
@@ -270,7 +270,20 @@ def main():  # after launching this you can run visualization.py to see the resu
     last_render = 0
 
     # init logger
-    log = {'time': [], 'x': [], 'y': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'tracking_error': []}
+    log = {
+        'time': [],
+        'x': [],
+        'y': [],
+        'lap_n': [],
+        'vx': [],
+        'v_ref': [],
+        'friction': [],
+        'tracking_error': [],
+        'track_progress': [],
+        'usage_fraction': [],
+        'data_fraction': [],
+        'unique_labels': [],
+    }
 
     # calc number of sim steps per one control step
     num_of_sim_steps = int(control_step / (env.timestep * 1000.0))
@@ -288,6 +301,12 @@ def main():  # after launching this you can run visualization.py to see the resu
                                   env.sim.agents[0].state[5],  # yaw rate
                                   env.sim.agents[0].state[2],  # steering angle
                                   ]) + np.random.randn(7) * 0.00001
+
+        meta = {
+            "usage_fraction": None,
+            "data_fraction": None,
+            "unique_labels": None,
+        }
 
         u = [0.0, 0.0]
         if model_to_use == 'pure_pursuit':
@@ -343,7 +362,7 @@ def main():  # after launching this you can run visualization.py to see the resu
                 error_drive = speed - env.sim.agents[0].state[3]
                 u[0] = 8.0 * error_drive
             else:
-                u, mpc_ref_path_x, mpc_ref_path_y, mpc_pred_x, mpc_pred_y, mpc_ox, mpc_oy = planner_dpc.plan(initial_inputs=initial_inputs,initial_outputs=initial_outputs)
+                u, mpc_ref_path_x, mpc_ref_path_y, mpc_pred_x, mpc_pred_y, mpc_ox, mpc_oy, meta = planner_dpc.plan(initial_inputs=initial_inputs,initial_outputs=initial_outputs)
 
                 # draw predicted states and reference trajectory
                 draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
@@ -353,14 +372,15 @@ def main():  # after launching this you can run visualization.py to see the resu
         _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
                                                                        np.array([waypoints[:, 1], waypoints[:, 2]]).T)
 
+        # print(tracking_error)
+
         # set correct friction to the environment
         if use_dyn_friction:
             min_id = get_closest_point_vectorized(np.array([obs['poses_x'][0], obs['poses_y'][0]]), np.array(tpamap))
-            env.params['tire_p_dy1'] = tpadata[str(min_id)][0] * 0.9  # mu_y
-            env.params['tire_p_dx1'] = tpadata[str(min_id)][0]  # mu_x
-        else:
-            env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
-            env.params['tire_p_dx1'] = constant_friction  # mu_x
+            constant_friction = tpadata[str(min_id)][0]
+
+        env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
+        env.params['tire_p_dx1'] = constant_friction  # mu_x
 
         # # print(env.params['tire_p_dx1'])
         # print("%f   %f" % (waypoints[:, 5][n_point], env.sim.agents[0].state[3]))
@@ -409,7 +429,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         initial_outputs.append(vehicle_state[:4])
 
         for i in range(num_of_sim_steps):
-            obs, rew, done, info = env.step(np.array([[u[1], u[0]]]))
+            obs, rew, _, info = env.step(np.array([[u[1], u[0]]]))
             step_reward += rew
 
             # Rendering
@@ -426,8 +446,19 @@ def main():  # after launching this you can run visualization.py to see the resu
         log['y'].append(env.sim.agents[0].state[1])
         log['vx'].append(env.sim.agents[0].state[3])
         log['v_ref'].append(waypoints[:, 5][n_point])
+        log['friction'].append(constant_friction)
         log['tracking_error'].append(tracking_error)
         log['lap_n'].append(obs['lap_counts'][0])
+        log['track_progress'].append(waypoints[n_point, 0])
+        log['usage_fraction'].append(
+            meta["usage_fraction"].tolist() if meta["usage_fraction"] is not None else None
+        )
+        log['data_fraction'].append(
+            meta["data_fraction"].tolist() if meta["data_fraction"] is not None else None
+        )
+        log['unique_labels'].append(
+            meta["unique_labels"].tolist() if meta["unique_labels"] is not None else None
+        )
 
 
 
@@ -435,7 +466,7 @@ def main():  # after launching this you can run visualization.py to see the resu
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
-    with open('log01_eval', 'w') as f:
+    with open(f'log_dpc_eval_{map_name}', 'w') as f:
         json.dump(log, f)
 
 

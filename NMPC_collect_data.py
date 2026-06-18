@@ -1,5 +1,4 @@
 import csv
-import random
 import time
 import yaml
 import gym
@@ -145,21 +144,47 @@ def main():  # after launching this you can run visualization.py to see the resu
     """
 
     # Choose program parameters
-    model_to_use = 'pure_pursuit'  # options: ext_kinematic, pure_pursuit, dynamic, random
-    map_name = 'Nuerburgring'  # Nuerburgring, SaoPaulo, rounded_rectangle, l_shape, BrandsHatch, DualLaneChange, Austin, Budapest, Catalunya
+    model_to_use = 'parameter_identification'  # options: ext_kinematic, pure_pursuit, dynamic, parameter_identification
+    map_name = 'l_shape'  # Nuerburgring, SaoPaulo, rounded_rectangle, l_shape, BrandsHatch, DualLaneChange, Austin, Budapest, Catalunya
     # Hockenheim, IMS, Melbourne, MexicoCity, Montreal, Monza, MoscowRaceway, Oschersleben, Sakhir, Sepang, Silverstone, Sochi, Spa, Spielberg
     # YasMarina
     rotate_map = True  # !!!! If the car is spawning with bad orientation change value here !!!! TODO Fix here so this is not needed anymore
-    use_dyn_friction = True
-    constant_friction = 0.7
+    use_dyn_friction = False
+    constant_friction = 0.5
     control_step = 100.0  # ms
     render_every = 100  # render graphics every n simulation steps
     constant_speed = False
     constant_speed_value = 14.0
     velocity_profile_multiplier = 1.0
-    number_of_laps = 1
+    number_of_laps = 6
     start_point = 1  # index on the trajectory to start from
-    max_laptime = 10000.0
+
+    initial_speeds = [8.0, 12.0, 16.0, 20.0]
+
+    maneuvers = [
+        # longitudinal only
+        ("coast", 3.0, 0.00, 0.0),
+        ("accel_m", 3.0, 0.00, 3.0),
+        ("brake_m", 2.0, 0.00, -3.0),
+
+        # lateral only — increasing amplitude
+        ("left_s", 4.0, 0.05, 0.0),
+        ("right_s", 4.0, -0.05, 0.0),
+        ("left_m", 5.0, 0.10, 0.0),
+        ("right_m", 5.0, -0.10, 0.0),
+        ("left_l", 5.0, 0.20, 0.0),
+        ("right_l", 5.0, -0.20, 0.0),
+        ("left_xl", 4.0, 0.35, 0.0),
+        ("right_xl", 4.0, -0.35, 0.0),
+
+        # combined slip
+        ("accel_left", 3.0, 0.10, 3.0),
+        ("accel_right", 3.0, -0.10, 3.0),
+        ("brake_left", 2.0, 0.10, -3.0),
+        ("brake_right", 2.0, -0.10, -3.0),
+        ("accel_left_l", 3.0, 0.20, 3.0),
+        ("brake_left_l", 2.0, 0.20, -3.0),
+    ]
 
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
@@ -253,8 +278,10 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     env.add_render_callback(render_callback)
     # init vector = [x,y,yaw,steering angle, velocity, yaw_rate, beta]
+    #obs, step_reward, done, info = env.reset(
+    #    np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, 8.0, 0.0, 0.0]]))
     obs, step_reward, done, info = env.reset(
-        np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, waypoints[start_point, 5], 0.0, 0.0]]))
+         np.array([[0.0, 0.0, 0.0, 0.0, 8.0, 0.0, 0.0]]))
     env.render()
 
     laptime = 0.0
@@ -265,6 +292,9 @@ def main():  # after launching this you can run visualization.py to see the resu
     #log = {'time': [], 'accl': [], 'steer': [], 'x': [], 'y': [], 'yaw': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'tracking_error': []}
     log_dpc = []
     log_nmpc = []
+    maneuver_id = 0
+    maneuver_time = 0.0
+    speed_id = 0
 
     # calc number of sim steps per one control step
     num_of_sim_steps = int(control_step / (env.timestep * 1000.0))
@@ -272,7 +302,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     print('Model used: %s' % model_to_use)
     while not done:
-        #velocity_profile_multiplier = (0.5 + 0.1 * obs['lap_counts'][0])
+        velocity_profile_multiplier = (0.5 + 0.1 * obs['lap_counts'][0])
         #print(velocity_profile_multiplier)
         waypoints[:, 5] = velocity_profile*velocity_profile_multiplier
         # Regulator step MPC
@@ -322,18 +352,35 @@ def main():  # after launching this you can run visualization.py to see the resu
             # draw predicted states and reference trajectory
             draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
             draw.predicted_traj_show = np.array([mpc_pred_x, mpc_pred_y]).T
-        elif model_to_use == "random":
-            if "u_prev" not in locals():
-                u_prev = [0.0, 0.0]
+        elif model_to_use == "parameter_identification":
+            name, duration, steer_cmd, acc_cmd = maneuvers[maneuver_id]
+            u = [acc_cmd, steer_cmd]
 
-            u[0] = np.clip(u_prev[0] + random.uniform(-0.3, 0.3), -3.5, 3.5)
-            u[1] = np.clip(u_prev[1] + random.uniform(-0.03, 0.03), -0.4189, 0.4189)
+            maneuver_time += control_step / 1000.0
+            if maneuver_time >= duration:
+                maneuver_time = 0.0
+                maneuver_id += 1
 
-            if env.sim.agents[0].state[3] < 1.0:
-                u[0] = 3.5
-                u[1] = 0.0
+                if maneuver_id >= len(maneuvers):
+                    maneuver_id = 0
+                    speed_id += 1
 
-            u_prev = [u[0], u[1]]
+                    if speed_id >= len(initial_speeds):
+                        done = 1
+                    else:
+                        obs, step_reward, _, info = env.reset(
+                            np.array([[0.0, 0.0, 0.0, 0.0, initial_speeds[speed_id], 0.0, 0.0]])
+                        )
+                else:
+                    # Reset between maneuvers to clear transients
+                    # Use current vx so speed is preserved across maneuvers within same speed group
+                    current_vx = env.sim.agents[0].state[3]
+                    obs, step_reward, _, info = env.reset(
+                        np.array([[0.0, 0.0, 0.0, 0.0, current_vx, 0.0, 0.0]])
+                    )
+                    # Re-apply friction after reset
+                    env.params['tire_p_dy1'] = constant_friction * 0.9
+                    env.params['tire_p_dx1'] = constant_friction
 
         _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
                                                                        np.array([waypoints[:, 1], waypoints[:, 2]]).T)
@@ -389,7 +436,6 @@ def main():  # after launching this you can run visualization.py to see the resu
         #print('Model used: %s' % model_to_use)
         # Simulation step
         step_reward = 0.0
-
         for i in range(num_of_sim_steps):
             obs, rew, _, info = env.step(np.array([[u[1], u[0]]]))
             step_reward += rew
@@ -416,7 +462,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         ])
         log_nmpc.append([
             laptime,
-            0,
+            maneuver_id + speed_id * len(maneuvers),
             env.sim.agents[0].accel,  # accel
             u[1],  # steering
             env.sim.agents[0].state[0],  # x
@@ -429,7 +475,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
 
 
-        if obs['lap_counts'][0] == number_of_laps or laptime > max_laptime:  # or env.sim.agents[0].state[3] < 0.4 or tracking_error > 10.0:
+        if obs['lap_counts'][0] == number_of_laps:  # or env.sim.agents[0].state[3] < 0.4 or tracking_error > 10.0:
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
@@ -439,19 +485,19 @@ def main():  # after launching this you can run visualization.py to see the resu
     log_nmpc_array = np.array(log_nmpc, dtype=np.float64)
 
     # Save CSV
-    with open(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "v", "yaw"])
-        writer.writerows(log_dpc_array)
+    #with open(f'dpc_data_{constant_friction}.csv', 'w', newline='') as f:
+    #    writer = csv.writer(f)
+    #    writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "v", "yaw"])
+    #    writer.writerows(log_dpc_array)
 
-    # with open(f'data/dpc_experiments/nmpc_data_{model_to_use}_{constant_friction}.csv', 'w', newline='') as f:
-    #     writer = csv.writer(f)
-    #     writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "yaw", "vx", "vy", "yaw_rate"])
-    #     writer.writerows(log_nmpc_array)
+    with open(f'data/nmpc_experiments/nmpc_data_{constant_friction}.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "yaw", "vx", "vy", "yaw_rate"])
+        writer.writerows(log_nmpc_array)
 
     # Save NumPy
-    np.save(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}.npy', log_dpc_array)
-    # np.save(f'data/dpc_experiments/nmpc_data_{model_to_use}_{constant_friction}.npy', log_nmpc_array)
+    #np.save(f'data/dpc_experiments/dpc_data_{constant_friction}.npy', log_dpc_array)
+    np.save(f'data/nmpc_experiments/nmpc_data_{constant_friction}.npy', log_nmpc_array)
 
 
 if __name__ == '__main__':

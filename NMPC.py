@@ -149,7 +149,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     # Choose program parameters
     model_to_use = 'nmpc'  # options: ext_kinematic, pure_pursuit, dynamic, nmpc
-    map_name = 'l_shape'  # Nuerburgring, SaoPaulo, rounded_rectangle, l_shape, BrandsHatch, DualLaneChange, Austin, Budapest, Catalunya
+    map_name = 'Nuerburgring'  # Nuerburgring, SaoPaulo, rounded_rectangle, l_shape, BrandsHatch, DualLaneChange, Austin, Budapest, Catalunya
     # Hockenheim, IMS, Melbourne, MexicoCity, Montreal, Monza, MoscowRaceway, Oschersleben, Sakhir, Sepang, Silverstone, Sochi, Spa, Spielberg
     # YasMarina
     rotate_map = True  # !!!! If the car is spawning with bad orientation change value here !!!! TODO Fix here so this is not needed anymore
@@ -262,7 +262,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     env.add_render_callback(render_callback)
     # init vector = [x,y,yaw,steering angle, velocity, yaw_rate, beta]
     obs, step_reward, done, info = env.reset(
-        np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, 8.0, 0.0, 0.0]]))
+        np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, waypoints[start_point, 5], 0.0, 0.0]]))
     env.render()
 
     laptime = 0.0
@@ -271,7 +271,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     last_acc = 0.0
 
     # init logger
-    log = {'time': [], 'x': [], 'y': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'tracking_error': []}
+    log = {'time': [], 'x': [], 'y': [], 'lap_n': [], 'vx': [], 'v_ref': [], 'friction': [], 'tracking_error': [], 'track_progress': []}
 
     # calc number of sim steps per one control step
     num_of_sim_steps = int(control_step / (env.timestep * 1000.0))
@@ -342,11 +342,10 @@ def main():  # after launching this you can run visualization.py to see the resu
         # set correct friction to the environment
         if use_dyn_friction:
             min_id = get_closest_point_vectorized(np.array([obs['poses_x'][0], obs['poses_y'][0]]), np.array(tpamap))
-            env.params['tire_p_dy1'] = tpadata[str(min_id)][0] * 0.9  # mu_y
-            env.params['tire_p_dx1'] = tpadata[str(min_id)][0]  # mu_x
-        else:
-            env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
-            env.params['tire_p_dx1'] = constant_friction  # mu_x
+            constant_friction = tpadata[str(min_id)][0]
+
+        env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
+        env.params['tire_p_dx1'] = constant_friction  # mu_x
 
         # # print(env.params['tire_p_dx1'])
         # print("%f   %f" % (waypoints[:, 5][n_point], env.sim.agents[0].state[3]))
@@ -409,8 +408,10 @@ def main():  # after launching this you can run visualization.py to see the resu
         log['y'].append(env.sim.agents[0].state[1])
         log['vx'].append(env.sim.agents[0].state[3])
         log['v_ref'].append(waypoints[:, 5][n_point])
+        log['friction'].append(constant_friction)
         log['tracking_error'].append(tracking_error)
         log['lap_n'].append(obs['lap_counts'][0])
+        log['track_progress'].append(waypoints[n_point, 0])
 
 
 
@@ -418,7 +419,7 @@ def main():  # after launching this you can run visualization.py to see the resu
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
-    with open('log01_eval', 'w') as f:
+    with open(f'log_nmpc_eval_{map_name}', 'w') as f:
         json.dump(log, f)
 
 

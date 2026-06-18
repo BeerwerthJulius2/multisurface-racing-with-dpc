@@ -28,16 +28,17 @@ keys = list(data.keys())
 for key in keys:
     data_lap[key] = np.array(data[key][np.bitwise_and(from_lap <= data['lap_n'], data['lap_n'] <= to_lap)])
 
-data_lap['w'] = data_lap['w'].squeeze().T
+if 'w' in data_lap.keys():
+    data_lap['w'] = data_lap['w'].squeeze().T
 
 
-plt.plot(data_lap['time'], data_lap['w'][0], label='0.5')
-plt.plot(data_lap['time'], data_lap['w'][1], label='0.6')
-plt.plot(data_lap['time'], data_lap['w'][2], label='0.9')
-plt.plot(data_lap['time'], data_lap['w'][3], label='1.1')
-# plt.plot(data_lap['time'], data_lap['w'][4], label='1.1')
-plt.legend()
-plt.show()
+    plt.plot(data_lap['time'], data_lap['w'][0], label='0.5')
+    plt.plot(data_lap['time'], data_lap['w'][1], label='0.6')
+    plt.plot(data_lap['time'], data_lap['w'][2], label='0.9')
+    plt.plot(data_lap['time'], data_lap['w'][3], label='1.1')
+    # plt.plot(data_lap['time'], data_lap['w'][4], label='1.1')
+    plt.legend()
+    plt.show()
 
 
 #  np.array(data['time'])[np.array(data['lap_n']) == 1.0]
@@ -59,9 +60,11 @@ plt.show()
 # np.array(data['time'])[np.array(data['lap_n']) == 1.0]
 ax = plt.figure().add_subplot()
 color_arr = []
-for i in range(len(data_lap['x'])):
-    # color_arr.append(data_lap['true_mu'][i])
-    color_arr.append(data_lap['w2'][i])
+
+if 'w2' in data_lap.keys():
+    for i in range(len(data_lap['x'])):
+        # color_arr.append(data_lap['true_mu'][i])
+        color_arr.append(data_lap['w2'][i])
 
 # scat = ax.scatter(data_lap['x'], data_lap['y'], cmap='plasma', marker='o', c=color_arr)  # , cmap='coolwarm', vmin=0, vmax=1.0
 scat = ax.scatter(data_lap['x'], data_lap['y'], cmap='coolwarm', marker='o', c=color_arr, vmin=0, vmax=1.0)  # , cmap='coolwarm', vmin=0, vmax=1.0
@@ -72,9 +75,11 @@ plt.show()
 
 ax = plt.figure().add_subplot()
 color_arr = []
-for i in range(len(data_lap['x'])):
-    color_arr.append(data_lap['true_mu'][i])
-    # color_arr.append(data_lap['w2'][i])
+
+if 'true_mu' in data_lap.keys():
+    for i in range(len(data_lap['x'])):
+        color_arr.append(data_lap['true_mu'][i])
+        # color_arr.append(data_lap['w2'][i])
 
 # scat = ax.scatter(data_lap['x'], data_lap['y'], cmap='plasma', marker='o', c=color_arr)  # , cmap='coolwarm', vmin=0, vmax=1.0
 scat = ax.scatter(data_lap['x'], data_lap['y'], cmap='coolwarm', marker='o', c=color_arr, vmin=0, vmax=1.0)  # , cmap='coolwarm', vmin=0, vmax=1.0

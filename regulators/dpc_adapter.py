@@ -16,7 +16,7 @@ class DPCAdapter:
         config_dir = os.path.join(os.path.dirname(experiment.__file__), "config")
 
         data_dir = os.path.join(
-            os.getcwd(), "data/dpc_experiments")
+            os.getcwd(), "data/dpc_experiments/02_tracking")
 
         print(f"Loading Hydra config from: {config_dir}")
         print(f"Using data directory: {data_dir}")
@@ -46,7 +46,7 @@ class DPCAdapter:
         initial_outputs = np.stack(list(initial_outputs), axis=1)  # [x, y, v, yaw]
 
         ref, _ = self.get_reference(last_output, pred_h=self.cfg.controller.prediction_horizon)
-        accl_seq, delta_seq, pred_x, pred_y, *_ = self.vehicle_dpc.plan(
+        accl_seq, delta_seq, pred_x, pred_y, _, _, meta = self.vehicle_dpc.plan(
             initial_inputs=initial_inputs,
             initial_outputs=initial_outputs,
             reference_trajectory=ref,
@@ -57,7 +57,7 @@ class DPCAdapter:
 
         u = [accl_seq[0], delta_seq[0]]
 
-        return u, mpc_ref_path_x, mpc_ref_path_y, pred_x, pred_y, pred_x, pred_y
+        return u, mpc_ref_path_x, mpc_ref_path_y, pred_x, pred_y, pred_x, pred_y, meta
 
     def update_waypoints(self, waypoints):
         self.waypoints = waypoints
