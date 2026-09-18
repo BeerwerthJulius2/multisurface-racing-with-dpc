@@ -45,3 +45,10 @@ outputs/single/tmp/
 pip-log.txt
 pip-delete-this-directory.txt
 .DS_Store
+
+# Generated run outputs
+evaluation/videos/
+log_dpc_eval_*
+log_nmpc_eval_*
+acados_ocp_*.json
+gp*.pth

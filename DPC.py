@@ -11,9 +11,9 @@ from regulators.path_follow_mpc import *
 from models.extended_kinematic import ExtendedKinematicModel
 from models.dynamic import DynamicBicycleModel
 from helpers.closest_point import *
+from helpers.rendering_utils import DrawDebug, VehicleImageOverlay, VideoRecorder, set_background_color
 import numpy as np
 
-from pyglet.gl import GL_POINTS
 import json
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -113,34 +113,6 @@ class MPCConfigDYN:
     CR2: float = -0.0095
 
 
-def draw_point(e, point, colour):
-    scaled_point = 50. * point
-    ret = e.batch.add(1, GL_POINTS, None, ('v3f/stream', [scaled_point[0], scaled_point[1], 0]), ('c3B/stream', colour))
-    return ret
-
-
-class DrawDebug:
-    def __init__(self):
-        self.reference_traj_show = np.array([[0, 0]])
-        self.predicted_traj_show = np.array([[0, 0]])
-        self.dyn_obj_drawn = []
-        self.f = 0
-
-    def draw_debug(self, e):
-        # delete dynamic objects
-        while len(self.dyn_obj_drawn) > 0:
-            if self.dyn_obj_drawn[0] is not None:
-                self.dyn_obj_drawn[0].delete()
-            self.dyn_obj_drawn.pop(0)
-
-        # spawn new objects
-        for p in self.reference_traj_show:
-            self.dyn_obj_drawn.append(draw_point(e, p, [255, 0, 0]))
-
-        for p in self.predicted_traj_show:
-            self.dyn_obj_drawn.append(draw_point(e, p, [0, 255, 0]))
-
-
 def main():  # after launching this you can run visualization.py to see the results
     """
     main entry point
@@ -151,18 +123,26 @@ def main():  # after launching this you can run visualization.py to see the resu
     map_name = 'l_shape'  # Nuerburgring, SaoPaulo, rounded_rectangle, l_shape, BrandsHatch, DualLaneChange, Austin, Budapest, Catalunya
     # Hockenheim, IMS, Melbourne, MexicoCity, Montreal, Monza, MoscowRaceway, Oschersleben, Sakhir, Sepang, Silverstone, Sochi, Spa, Spielberg
     # YasMarina
+    # map_name = 'Nuerburgring'
     rotate_map = True  # !!!! If the car is spawning with bad orientation change value here !!!! TODO Fix here so this is not needed anymore
     use_dyn_friction = True
-    constant_friction = 0.5
+    constant_friction = 1.0
     control_step = 100.0  # ms
     render_every = 40  # render graphics every n simulation steps
     constant_speed = False
     constant_speed_value = 15.0
     velocity_profile_multiplier = 1.0
     velocity_profile_max = 25.0
-    number_of_laps = 5
+    number_of_laps = 11  # paper: 11 laps, first discarded
     start_point = 1  # index on the trajectory to start from
     initialization_horizon = 5
+    vehicle_image_path = "assets/vehicle.png"
+    vehicle_image_rotation_offset_deg = 0.0  # set to 90.0 if the PNG nose points upward
+    camera_padding = 2000
+    record_video = False
+    video_path = f"evaluation/videos/dpc_{map_name}.mp4"
+    video_fps = 25
+    video_capture_every = 2
 
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
@@ -232,25 +212,38 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     # init graphics
     draw = DrawDebug()
+    vehicle_image = VehicleImageOverlay(
+        vehicle_image_path,
+        rotation_offset_deg=vehicle_image_rotation_offset_deg,
+    )
+    video_recorder = VideoRecorder(
+        video_path,
+        fps=video_fps,
+        capture_every=video_capture_every,
+        enabled=record_video,
+    )
 
     def render_callback(env_renderer):
         # custom extra drawing function
 
         e = env_renderer
+        set_background_color(e)
 
         # update camera to follow car
         x = e.cars[0].vertices[::2]
         y = e.cars[0].vertices[1::2]
         top, bottom, left, right = max(y), min(y), min(x), max(x)
         e.score_label.x = left
-        e.score_label.y = top - 7000
-        e.left = left - 3000
-        e.right = right + 3000
-        e.top = top + 3000
-        e.bottom = bottom - 3000
+        e.score_label.y = top - 2.3 * camera_padding
+        e.left = left - camera_padding
+        e.right = right + camera_padding
+        e.top = top + camera_padding
+        e.bottom = bottom - camera_padding
 
-        planner_pp.render_waypoints(e)
+        draw.draw_track_once(e, waypoints[:, [1, 2]])
         draw.draw_debug(e)
+        vehicle_image.update(e)
+        video_recorder.update(e)
 
     # MB - reference point: center of mass
     # dynamic_ST - reference point: center of mass
@@ -466,6 +459,7 @@ def main():  # after launching this you can run visualization.py to see the resu
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
+    video_recorder.close()
     with open(f'log_dpc_eval_{map_name}', 'w') as f:
         json.dump(log, f)
 
