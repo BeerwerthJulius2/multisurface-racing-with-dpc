@@ -628,7 +628,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
             with open('log01', 'w') as f:
                 json.dump(log, f)
-            with open('testing_dataset', 'w') as f:
+            with open('data/testing_dataset', 'w') as f:
                 json.dump(log_dataset, f)
 
         if obs['lap_counts'][0] - 1 == laps_done:
