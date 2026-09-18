@@ -52,3 +52,9 @@ log_dpc_eval_*
 log_nmpc_eval_*
 acados_ocp_*.json
 gp*.pth
+log01
+
+# Diagnostic plots from models/sanity_check.py and models/fit_check.py
+/variant_comparison.png
+/mb_vs_bicycle_mu*.png
+/model_comparison_mu*.png
