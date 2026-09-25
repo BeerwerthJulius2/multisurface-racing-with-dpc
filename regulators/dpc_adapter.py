@@ -27,6 +27,8 @@ class DPCAdapter:
                 overrides=[
                     "+experiment=vehicle_dpc_eval_multisurface",
                     f"dataset.path={data_dir}",
+                    # e.g. DPC_HYDRA_OVERRIDES="controller.lambda_g=10.0"
+                    *filter(None, os.environ.get("DPC_HYDRA_OVERRIDES", "").split(",")),
                 ]
             )
 

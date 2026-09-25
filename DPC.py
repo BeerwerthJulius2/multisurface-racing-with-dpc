@@ -1,3 +1,4 @@
+import os
 import time
 from collections import deque
 
@@ -144,6 +145,18 @@ def main():  # after launching this you can run visualization.py to see the resu
     video_fps = 25
     video_capture_every = 2
 
+    # Optional environment overrides, used by evaluation/03_uniform_friction.
+    # Without them the defaults above are unchanged.
+    map_name = os.environ.get('DPC_MAP_NAME', map_name)
+    if 'DPC_USE_DYN_FRICTION' in os.environ:
+        use_dyn_friction = os.environ['DPC_USE_DYN_FRICTION'] == '1'
+    constant_friction = float(os.environ.get('DPC_CONSTANT_FRICTION', constant_friction))
+    number_of_laps = int(os.environ.get('DPC_NUMBER_OF_LAPS', number_of_laps))
+    log_suffix = os.environ.get('DPC_LOG_SUFFIX', '')
+    video_path = f"evaluation/videos/dpc_{map_name}{log_suffix}.mp4"
+    velocity_profile_multiplier = float(os.environ.get('DPC_VELOCITY_MULTIPLIER', velocity_profile_multiplier))
+    headless = os.environ.get('DPC_HEADLESS', '0') == '1'  # skip rendering for batch runs
+
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
     # ekin_config.DTK = kin_config.DTK = dyn_config.DTK = control_step / 1000.0
@@ -252,11 +265,13 @@ def main():  # after launching this you can run visualization.py to see the resu
                    num_agents=1, timestep=0.001, model='MB', drive_control_mode='acc',
                    steering_control_mode='angle')
 
-    env.add_render_callback(render_callback)
+    if not headless:
+        env.add_render_callback(render_callback)
     # init vector = [x,y,yaw,steering angle, velocity, yaw_rate, beta]
     obs, step_reward, done, info = env.reset(
         np.array([[waypoints[start_point, 1], waypoints[start_point, 2], waypoints[start_point, 3], 0.0, waypoints[start_point, 5], 0.0, 0.0]]))
-    env.render()
+    if not headless:
+        env.render()
 
     laptime = 0.0
     start = time.time()
@@ -427,7 +442,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
             # Rendering
             last_render += 1
-            if last_render >= render_every:
+            if last_render >= render_every and not headless:
                 last_render = 0
                 env.render(mode='human_fast')
 
@@ -460,7 +475,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
     video_recorder.close()
-    with open(f'log_dpc_eval_{map_name}', 'w') as f:
+    with open(f'log_dpc_eval_{map_name}{log_suffix}', 'w') as f:
         json.dump(log, f)
 
 

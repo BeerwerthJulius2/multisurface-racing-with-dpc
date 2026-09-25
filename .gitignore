@@ -58,3 +58,8 @@ log01
 /variant_comparison.png
 /mb_vs_bicycle_mu*.png
 /model_comparison_mu*.png
+
+# Exploratory run outputs (regenerate with the scripts in evaluation/exploratory/)
+evaluation/exploratory/**/*.pdf
+evaluation/exploratory/**/*.svg
+log_dpc_eval_*_uniform_*
