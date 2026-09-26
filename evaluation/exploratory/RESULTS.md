@@ -1,4 +1,4 @@
-# Exploratory results, 2026-09-25/26
+# Exploratory results, 2026-09-25/27
 
 Control experiments on the implicit-friction-selection claim, run while preparing the
 ECC submission. Exploratory: not (yet) part of the paper's evaluation pipeline.
@@ -100,12 +100,72 @@ Mismatched/matched error ratio, corner windows only:
 - **Open question:** offline, mu=1.1 is the more distinguishable regime (1.89 vs 1.07),
   which is the opposite of the closed-loop asymmetry in section 1. Unresolved.
 
+## 6. Robustness: is the effect real, or a lucky scenario? (2026-09-27)
+
+`observability/pooled_influence.py` — the offline analogue of the paper's implied-friction
+figure: predict a window from the POOLED dataset and attribute the predicted future to the
+subsets via eta. Unlike the closed-loop version it admits proper controls.
+
+| check | corner separation | verdict |
+|---|---|---|
+| real labels, 5 seeds | **+23.2% +- 1.1%** | the effect |
+| shuffled labels, 5 seeds | -0.1% +- 1.2% | control clean |
+| placebo (one run split in half, same friction) | none | control clean |
+
+~20 sigma from the control, so not a lucky draw.
+
+### Paired coverage is a condition
+
+| candidate pool | corner separation |
+|---|---|
+| same-track-position trajectories excluded | +4% |
+| same-track-position trajectories kept | +22% |
+
+Discrimination needs the dataset to contain *comparable trajectories under both frictions at
+the current operating point*. The mechanism chooses between near-identical maneuvers recorded
+under different conditions; it does not recognize friction in the abstract. The shuffled
+control with twins kept gives +1%, so this is not an artifact of the twins themselves.
+
+**For the hardware campaign: drive the same maneuvers with both tire sets.** If the two
+conditions are recorded on different trajectories, the mechanism cannot show.
+
+### Parameter trends (offline, twins kept)
+
+| parameter | values | corner separation |
+|---|---|---|
+| T_ini | 3 / 5 / 10 | 11% / 22% / **45%** |
+| lambda_sigma | 1.01 / 10.1 / 101 | 9% / 22% / **61%** |
+| candidates | 50 / 100 / 300 | 40% / 22% / 17% |
+
+- T_ini and lambda_sigma behave as Section III predicts: a longer window accumulates more
+  evidence, and a larger slack penalty makes wrong-regime columns expensive. The
+  lambda_sigma claim in the Conditions paragraph was previously untested.
+- More candidates *reduce* discrimination: with more columns the wrong subset reconstructs
+  the window more easily. Contextual sampling therefore aids selection, not only tractability.
+- The sharpening does not transfer to closed loop: at lambda_sigma=101 the mu=0.5 run
+  diverges (tracking error 23.2). The operating point is a compromise.
+
+### Other geometries
+
+| track | corner separation | note |
+|---|---|---|
+| l_shape (baseline) | 51% (closed loop) | a_lat > 3.5 |
+| DualLaneChange, velocity 0.8 | 12%, correct ordering | a_lat > 2.4, weak replication |
+| Nuerburgring, velocity 0.6 | 1% | a_lat > 1.2 only: never leaves the linear region |
+
+Nuerburgring cannot test the mechanism: reaching ~3.5 m/s^2 on those radii needs ~30 m/s,
+while the dataset ends at 20.1 m/s. Either outside the data or below the excitation threshold.
+At full speed on DualLaneChange the mu=0.5 run spins out, hence velocity 0.8.
+
 ## Caveats
 
 - 2-3 laps per run, one track, single seed.
 - The eta diagnostic weights subsets by ||Y_f,j g_j||, so subsets with larger-magnitude
   futures (higher speed) get more weight mechanically. A ||g_j||-based version has not
   been checked; it needs g exposed from the adapter.
+- The placebo sits at 0.745 rather than the neutral 0.80, i.e. splitting one run in half
+  produces a bias of about -0.05. An order of magnitude below the effect, but unexplained.
+- Not checked: random vs contextual sampling in closed loop.
 - Cross-variant comparison in section 5 also changes the error metric and the retrieval
   metric, so the ratios are indicative rather than exact.
 
