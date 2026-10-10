@@ -145,7 +145,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     video_fps = 25
     video_capture_every = 2
 
-    # Optional environment overrides, used by evaluation/03_uniform_friction.
+    # Optional environment overrides, used by the diagnostics in evaluation/exploratory.
     # Without them the defaults above are unchanged.
     map_name = os.environ.get('DPC_MAP_NAME', map_name)
     if 'DPC_USE_DYN_FRICTION' in os.environ:
@@ -155,6 +155,10 @@ def main():  # after launching this you can run visualization.py to see the resu
     log_suffix = os.environ.get('DPC_LOG_SUFFIX', '')
     video_path = f"evaluation/videos/dpc_{map_name}{log_suffix}.mp4"
     velocity_profile_multiplier = float(os.environ.get('DPC_VELOCITY_MULTIPLIER', velocity_profile_multiplier))
+    velocity_profile_max = float(os.environ.get('DPC_VELOCITY_MAX', velocity_profile_max))  # paper Nuerburgring run: 20
+    initialization_horizon = int(os.environ.get('DPC_INIT_HORIZON', initialization_horizon))  # with controller.initialization_horizon
+    # measurement noise on x, y, v, yaw; 1.0 = 5 cm, 5 cm/s, 0.01 rad (the experiment config's noise block)
+    measurement_noise_std = float(os.environ.get('DPC_MEAS_NOISE', 0.0)) * np.array([0.05, 0.05, 0.05, 0.01, 0.0, 0.0, 0.0])
     headless = os.environ.get('DPC_HEADLESS', '0') == '1'  # skip rendering for batch runs
 
     ekin_config = MPCConfigEXT()
@@ -308,7 +312,7 @@ def main():  # after launching this you can run visualization.py to see the resu
                                   env.sim.agents[0].state[10],  # vy
                                   env.sim.agents[0].state[5],  # yaw rate
                                   env.sim.agents[0].state[2],  # steering angle
-                                  ]) + np.random.randn(7) * 0.00001
+                                  ]) + np.random.randn(7) * np.maximum(0.00001, measurement_noise_std)
 
         meta = {
             "usage_fraction": None,

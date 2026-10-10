@@ -49,6 +49,7 @@ pip-delete-this-directory.txt
 # Generated run outputs
 evaluation/videos/
 log_dpc_eval_*
+evaluation/exploratory/segment_sampling/logs/
 log_nmpc_eval_*
 acados_ocp_*.json
 gp*.pth

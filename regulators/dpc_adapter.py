@@ -16,7 +16,7 @@ class DPCAdapter:
         config_dir = os.path.join(os.path.dirname(experiment.__file__), "config")
 
         data_dir = os.path.join(
-            os.getcwd(), "data/dpc_experiments/02_tracking")
+            os.getcwd(), os.environ.get("DPC_DATA_DIR", "data/dpc_experiments/02_tracking"))
 
         print(f"Loading Hydra config from: {config_dir}")
         print(f"Using data directory: {data_dir}")
@@ -27,6 +27,8 @@ class DPCAdapter:
                 overrides=[
                     "+experiment=vehicle_dpc_eval_multisurface",
                     f"dataset.path={data_dir}",
+                    # use the cached merged dataset the simulation results were made with
+                    "++dataset.reuse_cached_merge=true",
                     # e.g. DPC_HYDRA_OVERRIDES="controller.lambda_g=10.0"
                     *filter(None, os.environ.get("DPC_HYDRA_OVERRIDES", "").split(",")),
                 ]
