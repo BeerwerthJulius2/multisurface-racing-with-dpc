@@ -158,6 +158,12 @@ def main():  # after launching this you can run visualization.py to see the resu
     velocity_profile_max = float(os.environ.get('DPC_VELOCITY_MAX', velocity_profile_max))  # paper Nuerburgring run: 20
     initialization_horizon = int(os.environ.get('DPC_INIT_HORIZON', initialization_horizon))  # with controller.initialization_horizon
     # measurement noise on x, y, v, yaw; 1.0 = 5 cm, 5 cm/s, 0.01 rad (the experiment config's noise block)
+    max_sim_time = float(os.environ.get('DPC_MAX_TIME', 'inf'))  # end runs that stop making progress
+    abort_tracking_error = float(os.environ.get('DPC_ABORT_ERROR', 'inf'))  # end runs that leave the track
+    oracle = os.environ.get('DPC_ORACLE', '0') == '1'  # sample only from the dataset of the true friction (0.5 / 1.1)
+    if os.environ.get('DPC_NO_LIDAR', '0') == '1':  # the scan is unused by the controllers; also disables collisions
+        from f110_gym.envs.base_classes import RaceCar
+        RaceCar.get_current_scan = lambda self: np.full(self.num_beams, 100.0)
     measurement_noise_std = float(os.environ.get('DPC_MEAS_NOISE', 0.0)) * np.array([0.05, 0.05, 0.05, 0.01, 0.0, 0.0, 0.0])
     headless = os.environ.get('DPC_HEADLESS', '0') == '1'  # skip rendering for batch runs
 
@@ -295,6 +301,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         'usage_fraction': [],
         'data_fraction': [],
         'unique_labels': [],
+        'pred_xy': [],  # planned positions over the horizon, for the prediction (promise) gap
     }
 
     # calc number of sim steps per one control step
@@ -374,7 +381,10 @@ def main():  # after launching this you can run visualization.py to see the resu
                 error_drive = speed - env.sim.agents[0].state[3]
                 u[0] = 8.0 * error_drive
             else:
+                if oracle:  # dataset labels: 0 = mu 0.5, 1 = mu 1.1; in between (0.8) unrestricted
+                    planner_dpc.data.oracle_label = 0 if constant_friction < 0.65 else 1 if constant_friction > 0.95 else None
                 u, mpc_ref_path_x, mpc_ref_path_y, mpc_pred_x, mpc_pred_y, mpc_ox, mpc_oy, meta = planner_dpc.plan(initial_inputs=initial_inputs,initial_outputs=initial_outputs)
+                meta["pred_xy"] = np.array([mpc_pred_x, mpc_pred_y])
 
                 # draw predicted states and reference trajectory
                 draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
@@ -471,10 +481,11 @@ def main():  # after launching this you can run visualization.py to see the resu
         log['unique_labels'].append(
             meta["unique_labels"].tolist() if meta["unique_labels"] is not None else None
         )
+        log['pred_xy'].append(meta["pred_xy"].tolist() if meta.get("pred_xy") is not None else None)
 
 
 
-        if obs['lap_counts'][0] == number_of_laps:  # or env.sim.agents[0].state[3] < 0.4 or tracking_error > 10.0:
+        if obs['lap_counts'][0] == number_of_laps or laptime > max_sim_time or tracking_error > abort_tracking_error:
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

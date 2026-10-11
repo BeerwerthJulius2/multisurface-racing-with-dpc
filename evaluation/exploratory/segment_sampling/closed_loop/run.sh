@@ -3,7 +3,9 @@
 # Each variant runs the multi-friction track (11 laps) and uniform mu=0.5 / 1.1 (3 laps), in parallel.
 #   bash evaluation/exploratory/segment_sampling/closed_loop/run.sh "TAG|ENV VARS|HYDRA OVERRIDES" ...
 # Variants used in the README (SEG=controller.path_sampling.sampling=segment,++controller.path_sampling.segment_length):
-#   "_slide40x6||$SEG=40,controller.num_traj=240"                  segment sampling 4 s x 6
+#   "_slide40x6||$SEG=40,controller.num_traj=240"                  segment sampling 4 s x 6 (ridge default 0.01)
+#   "_gate_run||controller.path_sampling.sampling=contextual,++controller.path_sampling.segment_gate=100000"
+#   "_oracle|DPC_ORACLE=1|"                                        only the matching dataset
 #   "_islack||++controller.input_slack=true"                       input slack as in the lab
 #   "_tini2|DPC_INIT_HORIZON=2|controller.initialization_horizon=2"  0.2 s window
 #   "_unpaired|DPC_DATA_DIR=data/dpc_experiments/02_tracking_unpaired|"  unpaired data
