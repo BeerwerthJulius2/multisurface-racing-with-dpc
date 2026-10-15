@@ -1,3 +1,4 @@
+import os
 import time
 from collections import deque
 
@@ -163,6 +164,16 @@ def main():  # after launching this you can run visualization.py to see the resu
     velocity_profile_max = 20.0
     number_of_laps = 10
     start_point = 1  # index on the trajectory to start from
+
+    # Optional environment overrides (as in DPC.py) for scripted runs; without them the defaults above are unchanged.
+    map_name = os.environ.get('DPC_MAP_NAME', map_name)
+    number_of_laps = int(os.environ.get('DPC_NUMBER_OF_LAPS', number_of_laps))
+    velocity_profile_multiplier = float(os.environ.get('DPC_VELOCITY_MULTIPLIER', velocity_profile_multiplier))
+    velocity_profile_max = float(os.environ.get('DPC_VELOCITY_MAX', velocity_profile_max))
+    abort_tracking_error = float(os.environ.get('DPC_ABORT_ERROR', 'inf'))  # end runs that leave the track
+    log_suffix = os.environ.get('DPC_LOG_SUFFIX', '')
+    if 'DPC_SEED' in os.environ:  # measurement noise, for repeated runs
+        np.random.seed(int(os.environ['DPC_SEED']))
 
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
@@ -336,9 +347,6 @@ def main():  # after launching this you can run visualization.py to see the resu
             draw.predicted_traj_show = np.array([mpc_pred_x, mpc_pred_y]).T
 
 
-        _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
-                                                                       np.array([waypoints[:, 1], waypoints[:, 2]]).T)
-
         # set correct friction to the environment
         if use_dyn_friction:
             min_id = get_closest_point_vectorized(np.array([obs['poses_x'][0], obs['poses_y'][0]]), np.array(tpamap))
@@ -402,6 +410,10 @@ def main():  # after launching this you can run visualization.py to see the resu
 
         laptime += step_reward
 
+        # tracking error, progress and reference speed of the state logged below (after the step), as in DPC.py
+        _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
+                                                                       np.array([waypoints[:, 1], waypoints[:, 2]]).T)
+
         # Logging
         log['time'].append(laptime)
         log['x'].append(env.sim.agents[0].state[0])
@@ -415,11 +427,11 @@ def main():  # after launching this you can run visualization.py to see the resu
 
 
 
-        if obs['lap_counts'][0] == number_of_laps:  # or env.sim.agents[0].state[3] < 0.4 or tracking_error > 10.0:
+        if obs['lap_counts'][0] == number_of_laps or tracking_error > abort_tracking_error:  # or env.sim.agents[0].state[3] < 0.4
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
-    with open(f'log_nmpc_eval_{map_name}', 'w') as f:
+    with open(f'log_nmpc_eval_{map_name}{log_suffix}', 'w') as f:
         json.dump(log, f)
 
 
