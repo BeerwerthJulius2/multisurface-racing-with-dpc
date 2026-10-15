@@ -1,0 +1,4 @@
+# The loader only checks these two rates (data rows are 0.1 s apart).
+experiment:
+  simulation_freq_hz: 1000
+  control_freq_hz: 10

@@ -1,0 +1,5 @@
+# Recreated 2026-10-15: the original .hydra/config.yaml was gitignored. The loader only checks these two rates
+# (DPC_collect_data.py / vehicle_collect_data.yaml: 1000 Hz simulation, 10 Hz control; data rows are 0.1 s apart).
+experiment:
+  simulation_freq_hz: 1000
+  control_freq_hz: 10
