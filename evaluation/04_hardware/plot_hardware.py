@@ -14,7 +14,7 @@ from helpers import paper_style as ps   # noqa: E402
 here = os.path.dirname(os.path.abspath(__file__))
 runs = json.load(open(os.path.join(here, "hardware_runs.json")))
 ps.apply()
-arms, tyres = ("oracle", "inverse", "pooled"), ("slippery", "normal")
+arms, tyres = ("pooled", "oracle", "inverse"), ("slippery", "normal")
 panels = (("lat_cm", "Lateral error [cm]"), ("pred_rms_cm", "Prediction error [cm]"), ("lap_s", "Lap time [s]"))
 fig, axes = plt.subplots(1, 3, figsize=(ps.COLUMN_IN, 1.6))
 for ax, (key, label) in zip(axes, panels):

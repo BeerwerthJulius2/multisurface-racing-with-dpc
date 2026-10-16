@@ -6,7 +6,7 @@ import numpy as np
 COLUMN_IN = 3.5   # IEEE two-column \columnwidth
 COLORS = {"NMPC": "#222222", "pooled": "#1b7f3b", "oracle": "#e69f00", "inverse": "#7b3294"}
 LINES = {"NMPC": "-", "pooled": "-", "oracle": (0, (4, 1.5)), "inverse": (0, (1, 1))}
-LABELS = {"NMPC": "NMPC", "pooled": "DPC pooled", "oracle": "DPC oracle", "inverse": "DPC inverse"}
+LABELS = {"NMPC": "NMPC", "pooled": "DPC pooled", "oracle": "DPC matched", "inverse": "DPC mismatched"}   # oracle / inverse arms
 FRICTION_CMAP, FRICTION_MIN, FRICTION_MAX = "coolwarm", 0.5, 1.1
 
 

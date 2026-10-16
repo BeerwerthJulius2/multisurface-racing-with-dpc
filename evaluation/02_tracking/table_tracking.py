@@ -39,8 +39,8 @@ def zones(map_name, files, bin_m=2.0):
     z["lap"] = (np.nanmean(te), med(sum(steps.values(), []))); return z
 
 
-arms = ("NMPC", "pooled", "oracle", "inverse")
-names = {"NMPC": "NMPC", "pooled": "DPC pooled", "oracle": "DPC oracle", "inverse": "DPC inverse"}
+arms = ("pooled", "oracle", "inverse", "NMPC")
+names = {"NMPC": "NMPC", "pooled": "DPC pooled", "oracle": "DPC matched", "inverse": "DPC mismatched"}
 pat = lambda m, a: os.path.join(results, f"log_nmpc_eval_{m}_s*" if a == "NMPC" else f"log_dpc_eval_{m}_eval_{a}_s*")
 L = {a: zones("l_shape", sorted(glob.glob(pat("l_shape", a)))) for a in arms}
 N = {a: curves("Nuerburgring", sorted(glob.glob(pat("Nuerburgring", a))), 10.0)[0] for a in ("NMPC", "pooled")}

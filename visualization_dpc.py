@@ -25,7 +25,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon
 
 from helpers import paper_style as ps
-from helpers.eval_metrics import prediction_error
+from helpers.eval_metrics import prediction_error, prediction_offset
 
 map_name = sys.argv[1] if len(sys.argv) > 1 else "l_shape"
 results = sys.argv[2] if len(sys.argv) > 2 else "evaluation/02_tracking/results"
@@ -33,6 +33,7 @@ arms = ("NMPC", "pooled", "oracle", "inverse") if map_name == "l_shape" else ("N
 bin_m = 2.0 if map_name == "l_shape" else 10.0
 readable_m = 0.01
 window_m = 10.0
+selection_m = 0.01   # selection map: the datasets' prediction errors differ by more than this
 ps.apply()
 
 with open("configs/config_%s.yaml" % map_name) as file:
@@ -59,6 +60,10 @@ def load_log(name):
             out[k] = nan(data[k])
     if "pred_xy" in data:
         out["prediction_error"] = prediction_error(data["pred_xy"], out["x"], out["y"])
+    if "implied_pred_xy" in data and any(c for c in data["implied_pred_xy"]):   # the three same-window predictions
+        off = prediction_offset(data["pred_xy"], out["x"], out["y"])
+        for key in ("pooled", "low", "high"):
+            out["cf_" + key] = prediction_error([c[key] if c else None for c in data["implied_pred_xy"]], out["x"], out["y"], offset=off)
     return out
 
 
@@ -117,7 +122,7 @@ ps.save(fig, f"evaluation/02_tracking/tracking_error_{map_name}")
 
 # closed loop: per friction zone and over the lap the controllers side by side, one dot per seed, bar at the mean
 # (tracking: per-position median over the seed's laps, averaged over the zone; prediction: median over the zone's steps)
-order = [a for a in ("oracle", "inverse", "pooled", "NMPC") if a in arms]
+order = [a for a in ("pooled", "oracle", "inverse", "NMPC") if a in arms]
 levels = list(np.unique(np.round(friction[np.isfinite(friction)], 1)))
 groups = levels + ["lap"]
 
@@ -179,37 +184,64 @@ def make_segments(x, y):
     return np.concatenate([points[:-1], points[1:]], axis=1)
 
 
-fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.7 if map_name == "l_shape" else 3.1))
-norm_c = plt.Normalize(vmin=ps.FRICTION_MIN, vmax=ps.FRICTION_MAX)
-ax.plot(x + offset * nx, y + offset * ny, color="#555555", lw=0.5)   # outline: friction not identifiable
-for sign, values in ((-1, friction), (1, implied)):
-    lc = LineCollection(make_segments(x + sign * offset * nx, y + sign * offset * ny), cmap=ps.FRICTION_CMAP, norm=norm_c)
-    lc.set_array(np.ma.masked_invalid(values[:-1]))
-    lc.set_linewidth(2.6)
-    lc.set_capstyle("butt")
-    ax.add_collection(lc)
+def track_map(outer, outer_cmap, outer_norm, outer_label, outline_label, stem, outer_ticks=None):
+    """track map: inner ring the true friction, outer ring `outer` (thin outline where it is NaN), a colour bar for each"""
+    fig = plt.figure(figsize=(ps.COLUMN_IN, 3.0 if map_name == "l_shape" else 3.3))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 0.035], hspace=0.08, wspace=0.25, left=0.04, right=0.96, bottom=0.12, top=0.99)
+    ax = fig.add_subplot(gs[0, :])
+    ax.plot(x + offset * nx, y + offset * ny, color="#555555", lw=0.5)
+    rings = []
+    for sign, values, cmap, nrm in ((-1, friction, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)),
+                                    (1, outer, outer_cmap, outer_norm)):
+        lc = LineCollection(make_segments(x + sign * offset * nx, y + sign * offset * ny), cmap=cmap, norm=nrm)
+        lc.set_array(np.ma.masked_invalid(values[:-1])); lc.set_linewidth(2.6); lc.set_capstyle("butt")
+        ax.add_collection(lc); rings.append(lc)
+    t_vec = np.array([dx[0], dy[0]]) / norm[0]; n_vec = np.array([nx[0], ny[0]]); center = np.array([x[0], y[0]])
+    half_width, n_cols, n_rows = 2.2 * offset, 6, 2   # start/finish line
+    tile_w, tile_h = 2 * half_width / n_cols, 0.8 * offset / n_rows
+    for row in range(n_rows):
+        for col in range(n_cols):
+            a, c = -half_width + col * tile_w, -0.4 * offset + row * tile_h
+            corners = [center + u * n_vec + v * t_vec for u, v in ((a, c), (a + tile_w, c), (a + tile_w, c + tile_h), (a, c + tile_h))]
+            ax.add_patch(Polygon(corners, closed=True, facecolor="black" if (row + col) % 2 == 0 else "white", edgecolor="black",
+                                 linewidth=0.3, zorder=10))
+    ax.set_aspect("equal"); ax.autoscale(); ax.set_axis_off()
+    if np.isnan(outer).any():
+        ax.plot([], [], color="#555555", lw=0.5, label=outline_label)
+        ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
+    for col, (lc, label, ticks) in enumerate(((rings[0], r"inner ring: track friction $\mu$", [0.5, 0.8, 1.1]), (rings[1], outer_label, outer_ticks))):
+        cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1, col]), orientation="horizontal", ticks=ticks)
+        cbar.set_label(label, labelpad=1, fontsize=7); cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
+    ps.save(fig, stem)
 
-# start/finish line
-t_vec = np.array([dx[0], dy[0]]) / norm[0]
-n_vec = np.array([nx[0], ny[0]])
-center = np.array([x[0], y[0]])
-half_width, n_cols, n_rows = 2.2 * offset, 6, 2
-tile_w, tile_h = 2 * half_width / n_cols, 0.8 * offset / n_rows
-for row in range(n_rows):
-    for col in range(n_cols):
-        a, c = -half_width + col * tile_w, -0.4 * offset + row * tile_h
-        corners = [center + u * n_vec + v * t_vec for u, v in ((a, c), (a + tile_w, c), (a + tile_w, c + tile_h), (a, c + tile_h))]
-        ax.add_patch(Polygon(corners, closed=True, facecolor="black" if (row + col) % 2 == 0 else "white", edgecolor="black",
-                             linewidth=0.3, zorder=10))
 
-ax.set_aspect("equal")
-ax.autoscale()
-ax.set_axis_off()
-if np.isnan(implied).any():
-    ax.plot([], [], color="#555555", lw=0.5, label="friction has no effect on the prediction")
-    ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
-cbar = fig.colorbar(lc, ax=ax, orientation="horizontal", fraction=0.05, pad=0.03, aspect=35)
-cbar.set_label(r"Friction $\mu$ (inner ring: track, outer ring: implied by the DPC prediction)")
-cbar.outline.set_linewidth(0.4)
-fig.tight_layout()
-ps.save(fig, f"evaluation/02_tracking/implied_friction_{map_name}")
+track_map(implied, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX), r"outer ring: implied by the prediction",
+          "friction has no effect on the prediction", f"evaluation/02_tracking/implied_friction_{map_name}")
+
+# selection map: on the same windows, does the pooled prediction match the better or the worse single-friction prediction
+# (errors vs the positions reached; regret 0 = as accurate as the better dataset, 1 = as the worse one)
+if all("cf_pooled" in d for d in data["pooled"]):
+    sums = {k: np.zeros(n_bins) for k in ("pooled", "low", "high", "n")}
+    for d in data["pooled"]:
+        ok = (d["lap_n"] >= 1) & np.isfinite(d["cf_pooled"]) & np.isfinite(d["cf_low"]) & np.isfinite(d["cf_high"])
+        b = np.minimum((d["track_progress"][ok] // bin_m).astype(int), n_bins - 1)
+        for key in ("pooled", "low", "high"):
+            np.add.at(sums[key], b, d["cf_" + key][ok])
+        np.add.at(sums["n"], b, 1)
+    mean = {key: win(sums[key]) / np.maximum(win(sums["n"]), 1) for key in ("pooled", "low", "high")}   # 10 m window, all laps
+    best, worst = np.minimum(mean["low"], mean["high"]), np.maximum(mean["low"], mean["high"])
+    matters = worst - best > selection_m
+    regret = np.where(matters, np.clip((mean["pooled"] - best) / np.maximum(worst - best, 1e-9), 0, 1), np.nan)
+    low_better = mean["low"] < mean["high"]
+    for z in np.unique(np.round(friction[np.isfinite(friction)], 1)):
+        m = np.isclose(friction, z, atol=0.05)
+        print(f"selection, mu {z:.1f}: data choice matters on {np.mean(matters[m]) * 100:.0f}% of the zone (mu 0.5 data better on "
+              f"{np.mean(low_better[m & matters]) * 100 if (m & matters).any() else np.nan:.0f}% of those), pooled regret median "
+              f"{np.nanmedian(regret[m]) if (m & matters).any() else np.nan:.2f}")
+    print(f"selection, lap: matters on {np.mean(matters) * 100:.0f}%, regret median {np.nanmedian(regret):.2f}, below 0.5 on "
+          f"{np.mean(regret[matters] < 0.5) * 100:.0f}% of those sections")
+    from matplotlib.colors import LinearSegmentedColormap   # noqa: E402
+    cmap_sel = LinearSegmentedColormap.from_list("selection", [ps.COLORS["pooled"], "#f2f2f2", ps.COLORS["inverse"]])
+    track_map(regret, cmap_sel, plt.Normalize(0, 1), "outer ring: pooled predicts like the\nbetter (0) ... worse (1) dataset",
+              f"datasets predict alike (< {100 * selection_m:.0f} cm)", f"evaluation/02_tracking/selection_{map_name}",
+              outer_ticks=[0, 0.5, 1])

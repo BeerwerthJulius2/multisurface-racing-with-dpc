@@ -319,6 +319,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         'implied_fit': [],  # relative residual of the mix
         'implied_d_low': [],  # distance of the pooled prediction to the mu 0.5-only one [m]
         'implied_d_high': [],  # ... and to the mu 1.1-only one [m]
+        'implied_pred_xy': [],  # the three predictions in the world frame (pooled / mu 0.5-only / mu 1.1-only), same windows
     }
 
     # calc number of sim steps per one control step
@@ -428,7 +429,8 @@ def main():  # after launching this you can run visualization.py to see the resu
                 meta["eta_low"] = share(low)
                 meta["eta_low_null"] = float(np.mean([share(rng.permutation(low)) for _ in range(20)]))
                 if log_implied_friction:
-                    meta["implied_mu"], meta["implied_dist"], meta["implied_fit"], meta["implied_d_low"], meta["implied_d_high"] = implied_friction(planner_dpc)
+                    (meta["implied_mu"], meta["implied_dist"], meta["implied_fit"], meta["implied_d_low"], meta["implied_d_high"],
+                     meta["implied_pred_xy"]) = implied_friction(planner_dpc, x0=np.asarray(initial_outputs[-1], float))
 
                 # draw predicted states and reference trajectory
                 draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
@@ -526,6 +528,7 @@ def main():  # after launching this you can run visualization.py to see the resu
         log['implied_fit'].append(meta.get("implied_fit"))
         log['implied_d_low'].append(meta.get("implied_d_low"))
         log['implied_d_high'].append(meta.get("implied_d_high"))
+        log['implied_pred_xy'].append(meta.get("implied_pred_xy"))
 
 
 
