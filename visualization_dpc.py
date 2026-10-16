@@ -79,14 +79,22 @@ for arm in arms:
 friction, _, _ = binned(data["pooled"], "friction")
 
 
-def friction_background(ax):
+def friction_background(ax, labels=False):
     ax.imshow(friction[np.newaxis, :], extent=[0, track_len, 0, 1], aspect="auto", cmap=ps.FRICTION_CMAP, vmin=ps.FRICTION_MIN,
               vmax=ps.FRICTION_MAX, alpha=0.35, origin="lower", interpolation="nearest", transform=ax.get_xaxis_transform())
+    if labels:   # one label per contiguous friction zone, at the top of the panel
+        zone = np.round(friction, 1); starts = np.r_[0, np.where(np.diff(zone) != 0)[0] + 1]; ends = np.r_[starts[1:], n_bins]
+        for i, (a, b) in enumerate(zip(starts, ends)):
+            x0, x1 = edges[a], edges[b]
+            if not np.isfinite(zone[a]) or x1 - x0 < 0.03 * track_len:   # empty bins (lap end), zones too narrow for a label
+                continue
+            ax.text((x0 + x1) / 2, 0.97, (r"$\mu$ = %.1f" if x1 - x0 > 0.08 * track_len else "%.1f") % zone[a],
+                    ha="center", va="top", fontsize=6.5, color="#333333", transform=ax.get_xaxis_transform())
 
 
 # tracking error (and prediction error) along the lap
 fig_arms = tuple(os.environ["FIG_ARMS"].split(",")) if os.environ.get("FIG_ARMS") else ("NMPC", "pooled")
-panels = [("tracking_error", "Tracking error [m]", fig_arms)]
+panels = [("tracking_error", "Tracking error [cm]", fig_arms)]
 if map_name == "l_shape" and "oracle" in fig_arms:
     panels.append(("prediction_error", "Prediction error [m]", tuple(a for a in fig_arms if a != "NMPC")))
 # as the hardware figure: tracking error of the mismatched and the pooled DPC relative to the matched one (default when both runs exist)
@@ -96,7 +104,7 @@ if relative:
 fig, axes = plt.subplots(len(panels), 1, sharex=True, figsize=(ps.COLUMN_IN, 1.45 + 1.15 * (len(panels) - 1)), squeeze=False)
 for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
     if key != "relative":   # the relative panel stays white (as the hardware figure), the zones are shown above it
-        friction_background(ax)
+        friction_background(ax, labels=ax is axes[0, 0])
     if key == "relative":
         k5 = max(int(round(window_m / bin_m)), 1)
         smooth = lambda a: np.array([np.nanmean(a[np.arange(i - k5 // 2, i - k5 // 2 + k5) % n_bins]) for i in range(n_bins)])
@@ -104,7 +112,8 @@ for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
         dw, dp = smooth(100 * (te["inverse"] - te["oracle"])), smooth(100 * (te["pooled"] - te["oracle"]))
         ax.fill_between(centers, 0, dw, color=ps.COLORS["inverse"], alpha=0.35, lw=0, label="DPC mismatched")
         ax.plot(centers, dw, color=ps.COLORS["inverse"], lw=0.6)
-        ax.plot(centers, dp, color=ps.COLORS["pooled"], lw=1.4)
+        ax.plot(centers, dp, color=ps.COLORS["pooled"], lw=1.4, label="DPC pooled")
+        ax.legend(loc="upper left", ncol=2, handlelength=1.8, columnspacing=0.8, borderaxespad=0.2)
         ax.axhline(0, color="#222222", lw=0.6); ax.set_ylabel(ylabel); ax.set_xlim(0, track_len)
         ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
         ax.set_ylim(1.15 * min(0, np.nanmin(dw), np.nanmin(dp)), 1.15 * max(np.nanmax(dw), np.nanmax(dp)))
@@ -112,6 +121,8 @@ for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
         continue
     for arm in panel_arms:
         med, lo, hi = binned(data[arm], key)
+        if key == "tracking_error":
+            med, lo, hi = 100 * med, 100 * lo, 100 * hi
         if arm in ("NMPC", "pooled") and key == "tracking_error":
             ax.fill_between(centers, lo, hi, color=ps.COLORS[arm], alpha=0.15, lw=0)
         ax.plot(centers, med, color=ps.COLORS[arm], ls=ps.LINES[arm], lw=1.0 if map_name == "l_shape" else 0.8, label=ps.LABELS[arm])
@@ -121,19 +132,17 @@ for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
         ax.set_yscale("log")   # the few large peaks would hide the differences between the variants
         ax.set_ylim(0.01, 1.0)
     else:
-        ax.set_ylim(0, 1.15 * max(np.nanmax(binned(data[a], key)[0]) for a in panel_arms))
+        ax.set_ylim(0, (1.3 if ax is axes[0, 0] else 1.15) * 100 * max(np.nanmax(binned(data[a], key)[0]) for a in panel_arms))
 if map_name == "Nuerburgring":   # largest deviation: the hairpin, twice the curvature of anything in the l_shape data
     k = np.nanargmax(binned(data["pooled"], "tracking_error")[0])
-    axes[0, 0].annotate("hairpin", xy=(centers[k], binned(data["pooled"], "tracking_error")[0][k]), xytext=(centers[k] + 350, 1.2),
+    axes[0, 0].annotate("hairpin", xy=(centers[k], 100 * binned(data["pooled"], "tracking_error")[0][k]), xytext=(centers[k] + 350, 120),
                         fontsize=7, arrowprops=dict(arrowstyle="-", lw=0.5, color="#444444"), va="center")
 handles, labels = axes[0, 0].get_legend_handles_labels()
-if relative:
-    h2, l2 = axes[-1, 0].get_legend_handles_labels(); handles, labels = handles + h2, labels + l2
-fig.legend(handles, labels, ncol=len(handles), loc="upper center", bbox_to_anchor=(0.5, 1.0), handlelength=1.8, columnspacing=0.8,
-           borderaxespad=0.1)
+axes[0, 0].legend(handles, labels, ncol=len(handles), loc="lower left", bbox_to_anchor=(0, 1.0), handlelength=1.8, columnspacing=0.8,
+                  borderaxespad=0, borderpad=0.2)
 axes[-1, 0].set_xlabel("Progress on the track [m]")
 fig.align_ylabels(axes[:, 0])
-fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
+fig.tight_layout(h_pad=0.4)
 ps.save(fig, f"{fig_dir}/tracking_error_{map_name}")
 
 # implied friction on the track map (evidence-weighted)
@@ -167,18 +176,18 @@ def make_segments(x, y):
     return np.concatenate([points[:-1], points[1:]], axis=1)
 
 
-def track_map(outer, outer_cmap, outer_norm, outer_label, outline_label, stem, outer_ticks=None):
-    """track map: inner ring the true friction, outer ring `outer` (thin outline where it is NaN), a colour bar for each"""
+def track_map(outer, outer_label, outline_label, stem):
+    """track map: inner ring the true friction, outer ring `outer` on the same friction colour scale (thin outline where it is
+    NaN), one shared colour bar"""
     fig = plt.figure(figsize=(ps.COLUMN_IN, 2.5 if map_name == "l_shape" else 3.3))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 0.035], hspace=0.08, wspace=0.25, left=0.04, right=0.96, bottom=0.12, top=0.99)
-    ax = fig.add_subplot(gs[0, :])
+    gs = fig.add_gridspec(2, 1, height_ratios=[1, 0.035], hspace=0.08, left=0.04, right=0.96, bottom=0.12, top=0.99)
+    ax = fig.add_subplot(gs[0])
     ax.plot(x + offset * nx, y + offset * ny, color="#555555", lw=0.5)
-    rings = []
-    for sign, values, cmap, nrm in ((-1, friction, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)),
-                                    (1, outer, outer_cmap, outer_norm)):
-        lc = LineCollection(make_segments(x + sign * offset * nx, y + sign * offset * ny), cmap=cmap, norm=nrm)
+    nrm = plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)
+    for sign, values in ((-1, friction), (1, outer)):
+        lc = LineCollection(make_segments(x + sign * offset * nx, y + sign * offset * ny), cmap=ps.FRICTION_CMAP, norm=nrm)
         lc.set_array(np.ma.masked_invalid(values[:-1])); lc.set_linewidth(2.6); lc.set_capstyle("butt")
-        ax.add_collection(lc); rings.append(lc)
+        ax.add_collection(lc)
     t_vec = np.array([dx[0], dy[0]]) / norm[0]; n_vec = np.array([nx[0], ny[0]]); center = np.array([x[0], y[0]])
     half_width, n_cols, n_rows = 2.2 * offset, 6, 2   # start/finish line
     tile_w, tile_h = 2 * half_width / n_cols, 0.8 * offset / n_rows
@@ -192,11 +201,10 @@ def track_map(outer, outer_cmap, outer_norm, outer_label, outline_label, stem, o
     if np.isnan(outer).any():
         ax.plot([], [], color="#555555", lw=0.5, label=outline_label)
         ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
-    for col, (lc, label, ticks) in enumerate(((rings[0], r"inner ring: track friction $\mu$", [0.5, 0.8, 1.1]), (rings[1], outer_label, outer_ticks))):
-        cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1, col]), orientation="horizontal", ticks=ticks)
-        cbar.set_label(label, labelpad=1, fontsize=7); cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
+    cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1]), orientation="horizontal", ticks=[0.5, 0.8, 1.1])
+    cbar.set_label(r"friction $\mu$ (inner ring: track, outer ring: " + outer_label + ")", labelpad=1, fontsize=7)
+    cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
     ps.save(fig, stem)
 
 
-track_map(implied, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX), r"outer ring: implied by the prediction",
-          "friction has no effect on the prediction", f"{fig_dir}/implied_friction_{map_name}")
+track_map(implied, "implied by the prediction", "friction has no effect on the prediction", f"{fig_dir}/implied_friction_{map_name}")

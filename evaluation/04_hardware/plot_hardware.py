@@ -28,13 +28,13 @@ fig, axes = plt.subplots(2, 1, sharex=True, sharey=True, figsize=(ps.COLUMN_IN, 
 for ax, (t, name) in zip(axes, (("slippery", "slippery tyres"), ("normal", "normal tyres"))):
     m_, w_, p_ = along(t, "oracle"), along(t, "inverse"), along(t, "pooled")
     dw, dp = w_ - m_, p_ - m_
-    ax.fill_between(c, 0, dw, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="mismatched")
-    ax.plot(c, dw, color=ps.COLORS["inverse"], lw=0.6); ax.plot(c, dp, color=ps.COLORS["pooled"], lw=1.4, label="pooled")
+    ax.fill_between(c, 0, dw, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="DPC mismatched")
+    ax.plot(c, dw, color=ps.COLORS["inverse"], lw=0.6); ax.plot(c, dp, color=ps.COLORS["pooled"], lw=1.4, label="DPC pooled")
+    ax.legend(loc="upper right", ncol=2, handlelength=1.8, columnspacing=0.8, borderaxespad=0.2)
     ax.axhline(0, color="#222222", lw=0.6); ax.set_xlim(0, L); ax.set_ylabel("Lateral error\nvs matched [cm]")
     ax.set_title(name, loc="left", fontsize=7, pad=2)
     ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
     print(f"along the lap, {name}: mismatched {np.nanmean(dw):+.2f} cm, pooled {np.nanmean(dp):+.2f} cm vs matched")
-axes[1].legend(loc="upper right", fontsize=7, title="vs matched data", title_fontsize=6.5, ncol=2)
 axes[-1].set_xlabel("Progress on the track [m]")
 fig.tight_layout(h_pad=0.3)
 ps.save(fig, os.path.join(here, "hardware"))
