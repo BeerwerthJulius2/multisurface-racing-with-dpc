@@ -240,8 +240,31 @@ if all("cf_pooled" in d for d in data["pooled"]):
               f"{np.nanmedian(regret[m]) if (m & matters).any() else np.nan:.2f}")
     print(f"selection, lap: matters on {np.mean(matters) * 100:.0f}%, regret median {np.nanmedian(regret):.2f}, below 0.5 on "
           f"{np.mean(regret[matters] < 0.5) * 100:.0f}% of those sections")
+    # rings in cm on one scale: what the wrong dataset costs (worse - better) and what pooling costs (pooled - better)
+    stake, cost = 100 * (worst - best), 100 * np.clip(mean["pooled"] - best, 0, None)
+    print(f"selection, lap: wrong-dataset cost {np.nanmean(stake[matters]):.1f} cm, pooling cost {np.nanmean(cost[matters]):.1f} cm "
+          f"(mean over the sections where it matters)")
     from matplotlib.colors import LinearSegmentedColormap   # noqa: E402
-    cmap_sel = LinearSegmentedColormap.from_list("selection", [ps.COLORS["pooled"], "#f2f2f2", ps.COLORS["inverse"]])
-    track_map(regret, cmap_sel, plt.Normalize(0, 1), "outer ring: pooled predicts like the\nbetter (0) ... worse (1) dataset",
-              f"datasets predict alike (< {100 * selection_m:.0f} cm)", f"evaluation/02_tracking/selection_{map_name}",
-              outer_ticks=[0, 0.5, 1])
+    cmap_cm = LinearSegmentedColormap.from_list("cost", ["#f4f4f4", "#c9a6d3", ps.COLORS["inverse"], "#3b1247"])
+    vmax = np.ceil(np.nanpercentile(stake[matters], 95))
+    fig = plt.figure(figsize=(ps.COLUMN_IN, 3.0))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 0.035], hspace=0.08, wspace=0.25, left=0.04, right=0.96, bottom=0.12, top=0.99)
+    ax = fig.add_subplot(gs[0, :])
+    rings = []
+    for k_off, values, cmap, nrm in ((-1, friction, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)),
+                                     (1, np.where(matters, stake, np.nan), cmap_cm, plt.Normalize(0, vmax)),
+                                     (2.6, np.where(matters, cost, np.nan), cmap_cm, plt.Normalize(0, vmax))):
+        X, Y = x + k_off * offset * nx, y + k_off * offset * ny
+        ax.plot(X, Y, color="#555555", lw=0.4) if k_off > 0 else None
+        lc = LineCollection(make_segments(X, Y), cmap=cmap, norm=nrm); lc.set_array(np.ma.masked_invalid(values[:-1]))
+        lc.set_linewidth(2.4); lc.set_capstyle("butt"); ax.add_collection(lc); rings.append(lc)
+    ax.set_aspect("equal"); ax.autoscale(); ax.set_axis_off()
+    ax.plot([], [], color="#555555", lw=0.4, label=f"datasets predict alike (< {100 * selection_m:.0f} cm)")
+    ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
+    ax.annotate("inner: track friction\nmiddle: wrong dataset costs\nouter: pooling costs", xy=(0.99, 0.99), xycoords="axes fraction",
+                ha="right", va="top", fontsize=7)
+    for col, (lc, label, ticks) in enumerate(((rings[0], r"track friction $\mu$", [0.5, 0.8, 1.1]),
+                                              (rings[1], "extra prediction error [cm]", None))):
+        cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1, col]), orientation="horizontal", ticks=ticks)
+        cbar.set_label(label, labelpad=1, fontsize=7); cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
+    ps.save(fig, f"evaluation/02_tracking/selection_{map_name}")
