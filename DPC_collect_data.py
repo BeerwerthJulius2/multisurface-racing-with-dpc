@@ -191,7 +191,6 @@ def main():  # after launching this you can run visualization.py to see the resu
     with open('configs/config_%s.yaml' % map_name) as file:
         conf_dict = yaml.load(file, Loader=yaml.FullLoader)
     conf = Namespace(**conf_dict)
-    conf.wpt_path = os.environ.get('DPC_WPT_PATH', conf.wpt_path)  # e.g. a friction-aware speed profile (evaluation/02_tracking)
 
     if use_dyn_friction:
         if map_name == 'l_shape':

@@ -30,18 +30,17 @@ def ls_predict(Up, Uf, Yp, Yf, u_ini, y_ini, u_f, lambda_g, lambda_sigma, input_
     return Yf @ g
 
 
-def implied_friction(planner_dpc, frictions=(0.5, 1.1), labels=(0, 1), x0=None):
+def implied_friction(planner_dpc, frictions=(0.5, 1.1), labels=(0, 1)):
     """(implied mu, distance [m] between the two single-dataset predictions (rms position over the horizon), relative fit
     residual, distance [m] of the pooled prediction to the mu-0.5 one, and to the mu-1.1 one) for the step the controller
-    just solved; None values if the step has no solution. With x0 (the current output, world frame) also the three predicted
-    position sequences in the world frame, {"pooled" / "low" / "high": [x, y]} (evaluation against the positions reached)."""
+    just solved; None values if the step has no solution."""
     dpc = planner_dpc.vehicle_dpc.dpc
     cfg, c, data = planner_dpc.cfg, planner_dpc.cfg.controller, planner_dpc.data
     # VehicleDPC.plan denormalises/unaligns the solution arrays in place after the solve, so the window, reference and
     # planned inputs are taken from the copies the DPC logs inside solve() (normalised, aligned frame of this step).
     buf = getattr(planner_dpc.experiment_logger, "_dpc_buf", None)
     if not buf or not buf.get("future_inputs") or buf["future_inputs"][-1] is None:
-        return (None,) * (5 if x0 is None else 6)
+        return None, None, None, None, None
     u_ini, y_ini, ref, u_f = (np.asarray(buf[k][-1], float).flatten(order="F")
                               for k in ("initial_inputs", "initial_outputs", "reference_trajectory", "future_inputs"))
     args = dict(lambda_g=float(c.lambda_g), lambda_sigma=float(c.lambda_sigma), input_slack=bool(c.get("input_slack", False)),
@@ -65,16 +64,4 @@ def implied_friction(planner_dpc, frictions=(0.5, 1.1), labels=(0, 1), x0=None):
     def pos_dist(X):                                 # rms position distance over the horizon [m] (normalised, aligned)
         Xm = X.reshape(-1, n_out).T
         return float(np.sqrt(np.mean((Xm[0] * sd[0]) ** 2 + (Xm[1] * sd[1]) ** 2)))
-    out = (w * frictions[0] + (1 - w) * frictions[1], pos_dist(D), fit, pos_dist(P - A), pos_dist(P - B))
-    if x0 is None:
-        return out
-    vd = planner_dpc.vehicle_dpc   # as VehicleDPC.plan: denormalise, then unalign around the current output
-    world = {}
-    for key, X in (("pooled", P), ("low", A), ("high", B)):
-        Y = X.reshape(-1, n_out).T
-        if vd.normalize:
-            Y = vd.denormalize_fcn(Y, vd.output_mean, vd.output_std, vd.output_dim)
-        if vd.align:
-            Y = vd.unalign_fcn(Y, np.asarray(x0, float).copy())
-        world[key] = np.asarray(Y)[:2].tolist()
-    return out + (world,)
+    return w * frictions[0] + (1 - w) * frictions[1], pos_dist(D), fit, pos_dist(P - A), pos_dist(P - B)

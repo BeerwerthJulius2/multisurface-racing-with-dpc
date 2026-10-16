@@ -15,13 +15,15 @@ acados is built in `~/dev/acados` (else set `ACADOS_SOURCE_DIR`, `LD_LIBRARY_PAT
 | Paper | Data | Results | Run / plot |
 |---|---|---|---|
 | Fig. 1 prediction | `data/dpc_experiments/01_prediction` | `evaluation/01_prediction/prediction_results.json` | `DPC_prediction_error.py`; `evaluation/01_prediction/visualize_prediction_errors.py <results.json>` |
-| Figs. 2-3, Table I (L-shape) | `data/dpc_experiments/02_tracking_mu_aware` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh` (friction-aware profile: `friction_aware_profile.py`); `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
-| Fig. 4 (Nürburgring) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled`; `visualization_dpc.py Nuerburgring` |
+| Fig. 2 tracking (+ matched / mismatched data), Fig. 3 implied friction, Table I | `data/dpc_experiments/02_tracking_v2` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh`; `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
+| Nürburgring (Table I; figure optional) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled`; `visualization_dpc.py Nuerburgring` |
 | Hardware figure | `data/dpc_experiments/04_hardware` (README) | `evaluation/04_hardware/hardware_runs.json` | lab runs (ros2-workspace-lab-dpc); `extract_lab_runs.py <workspace>`; `evaluation/04_hardware/plot_hardware.py` |
 
-NMPC baseline: Pacejka parameters and g-g limits in `external/nmpc/Config/RoboRacer-Multibody` (midpoint of the mu 0.5 and 1.1
-fits, paper Sec. IV-B; fitting script `models/fit_nmpc_parameters.py`, data `data/nmpc_experiments`); the variants for one
-assumed friction are in `evaluation/02_tracking/nmpc_config` (`DPC_NMPC_FRICTION`; only the midpoint completes the laps). Figure style (colours, sizes): `helpers/paper_style.py`.
+"matched" / "mismatched" = the oracle / inverse runs (DPC_ORACLE=1 / inverse: sampling restricted to the dataset of the true /
+the other friction). NMPC baseline: Pacejka parameters and g-g limits in `external/nmpc/Config/RoboRacer-Multibody` (midpoint
+of the mu 0.5 and 1.1 fits, paper Sec. IV-B; fitting script `models/fit_nmpc_parameters.py`, data `data/nmpc_experiments`).
+Figure style (colours, sizes): `helpers/paper_style.py`. Further experiments (friction-aware speed profile, NMPC variants for
+one assumed friction, same-window selection analysis): branch `experiment/friction-aware-eval`.
 
 ## Simulator
 This repository is using multi-body full scale car version of the [F1/10 gym](https://github.com/atomyks/f1tenth_gym/tree/multibody).

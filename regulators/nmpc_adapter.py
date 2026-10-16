@@ -1,4 +1,3 @@
-import os
 from copy import copy
 
 import yaml
@@ -26,12 +25,6 @@ class NMPCAdapter:
         MPC_params_file = "RoboRacer-Multibody/MPC_params.yaml"
         with open(config_path + sim_main_params_file, 'r') as file:
             sim_main_params = yaml.load(file, Loader=yaml.FullLoader)
-        # DPC_NMPC_FRICTION=0.5|0.8|1.1: tyre parameters and lateral limit (0.75 mu g) for one assumed friction
-        # (evaluation/02_tracking/nmpc_config; 0.8 = the files above); unset: the files above
-        if os.environ.get('DPC_NMPC_FRICTION'):
-            variant = f"../../../evaluation/02_tracking/nmpc_config/mu{os.environ['DPC_NMPC_FRICTION']}/"
-            MPC_params_file = variant + "MPC_params.yaml"
-            sim_main_params['tire_params_file_MPC'] = variant + "pacejka_params.yaml"
 
         self.vehicle_nmpc = Nonlinear_Model_Predictive_Controller(config_path, MPC_params_file, sim_main_params, initial_state)
 
