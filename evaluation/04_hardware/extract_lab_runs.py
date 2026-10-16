@@ -2,7 +2,7 @@
 logs of the ros2-workspace-lab-dpc workspace -> hardware_runs.json (committed; the raw logs, 77 MB, stay in the lab workspace).
 Lateral error: rms distance to the raceline (and |distance| every 4th step); lap time from the mean progress speed (and the
 time of each complete lap); prediction error: position error of the controller's prediction vs the measured trajectory, rms
-over the horizon (and at its last step), median over the run (and every 4th step).
+over the horizon (and at its last step), median over the run (and every 4th step); track position of those steps.
 Tyre set by time (slippery block before 12:12, then normal); arm from controller.path_sampling.oracle_labels.
 usage (lab environment: ROS 2 jazzy, the dpc venv): extract_lab_runs.py <workspace> [out.json]"""
 import sys, glob, os, json, numpy as np, logging, warnings
@@ -35,15 +35,17 @@ for d in sorted(glob.glob(WS + "/src/dpc-controller/log/2026-10-15T1[12]-*")):
         class L:
             def log_dpc_step(self, *a, **k): pass
         ctl = VehicleDPC(data=TrajectoryDataset(cfg), cfg=cfg, data_logger=L())
-    sd = np.asarray(ctl.output_std, float); H = cr.prediction_horizon; YF = z["dpc/future_outputs"]; e_rms, e_end = [], []
+    sd = np.asarray(ctl.output_std, float); H = cr.prediction_horizon; YF = z["dpc/future_outputs"]; e_rms, e_end, s_pred = [], [], []
     for i in np.where(m)[0][::4]:
         if i + H >= len(t): continue
         y_true = ctl.normalize_fcn(ctl.align_fcn(st[i + 1:i + H + 1].T.copy(), st[i].copy()), ctl.output_mean, ctl.output_std, 4)
         er = (YF[i].astype(float) - y_true) * sd[:, None]; ep = np.hypot(er[0], er[1])
-        e_rms.append(np.sqrt(np.mean(ep ** 2))); e_end.append(ep[-1])
+        e_rms.append(np.sqrt(np.mean(ep ** 2))); e_end.append(ep[-1]); s_pred.append(s_un[i] % rl["length"])
     out.append(dict(run=run, tyre=tyre, arm=arm, lat_cm=100 * float(np.sqrt(np.mean(lat[m] ** 2))), lap_s=float(lap),
                     pred_rms_cm=100 * float(np.median(e_rms)), pred_end_cm=100 * float(np.median(e_end)), horizon=int(H),
                     lap_times_s=[round(float(x), 3) for x in laps], lat_steps_cm=[round(100 * abs(float(x)), 2) for x in lat[m][::4]],
-                    pred_steps_cm=[round(100 * float(x), 2) for x in e_rms]))
+                    pred_steps_cm=[round(100 * float(x), 2) for x in e_rms], lap_length_m=float(rl["length"]),
+                    lat_steps_s_m=[round(float(x), 3) for x in (s_un[m][::4] % rl["length"])],
+                    pred_steps_s_m=[round(float(x), 3) for x in s_pred]))
     print({k: v for k, v in out[-1].items() if not isinstance(v, list)}, len(laps), 'laps')
 json.dump(out, open(OUT, "w"), indent=1); print("written", OUT)

@@ -31,3 +31,29 @@ for ax, (key, label) in zip(axes, panels):
 ps.arm_legend(fig, arms)
 fig.tight_layout(w_pad=0.6, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
 ps.save(fig, os.path.join(here, "hardware"))
+
+# along the lap (as the simulation's tracking figure): per tyre set the lateral error of the mismatched and the pooled run
+# relative to the matched run, per track position (median over the steps of the 3 runs, 0.25 m sections, 1 m running mean)
+L = runs[0]["lap_length_m"]; bw = 0.25; nbin = int(np.ceil(L / bw)); c = (np.arange(nbin) + 0.5) * bw
+def along(t, a):
+    v = [[] for _ in range(nbin)]
+    for r in runs:
+        if r["tyre"] == t and r["arm"] == a:
+            for s_, e in zip(r["lat_steps_s_m"], r["lat_steps_cm"]):
+                v[min(int(s_ // bw), nbin - 1)].append(e)
+    med = np.array([np.median(x) if x else np.nan for x in v]); k = 4
+    return np.array([np.nanmean(med[np.arange(i - k // 2, i - k // 2 + k) % nbin]) for i in range(nbin)])
+fig, axes = plt.subplots(2, 1, sharex=True, sharey=True, figsize=(ps.COLUMN_IN, 2.2))
+for ax, (t, name) in zip(axes, (("slippery", "slippery tyres"), ("normal", "normal tyres"))):
+    m_, w_, p_ = along(t, "oracle"), along(t, "inverse"), along(t, "pooled")
+    dw, dp = w_ - m_, p_ - m_
+    ax.fill_between(c, 0, dw, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="mismatched")
+    ax.plot(c, dw, color=ps.COLORS["inverse"], lw=0.6); ax.plot(c, dp, color=ps.COLORS["pooled"], lw=1.4, label="pooled")
+    ax.axhline(0, color="#222222", lw=0.6); ax.set_xlim(0, L); ax.set_ylabel("Lateral error\nvs matched [cm]")
+    ax.text(0.01, 0.95, name, transform=ax.transAxes, ha="left", va="top", fontsize=7)
+    ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
+    print(f"along the lap, {name}: mismatched {np.nanmean(dw):+.2f} cm, pooled {np.nanmean(dp):+.2f} cm vs matched")
+axes[0].legend(loc="upper right", fontsize=7, title="vs matched data", title_fontsize=6.5, ncol=2)
+axes[-1].set_xlabel("Progress on the track [m]")
+fig.tight_layout(h_pad=0.3)
+ps.save(fig, os.path.join(here, "hardware_along"))

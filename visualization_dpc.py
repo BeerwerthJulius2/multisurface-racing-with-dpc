@@ -217,6 +217,49 @@ def track_map(outer, outer_cmap, outer_norm, outer_label, outline_label, stem, o
     ps.save(fig, stem)
 
 
+def along_track(other, pooled, other_label, ylabel, legend_title, stem, panels=None):
+    """small track map (friction, progress marks), friction strip with zone labels, and along the lap the curve of the other
+    variant (area) and of pooled DPC (line) relative to the zero line; panels: several such charts [(other, pooled,
+    other_label, ylabel, legend_title), ...] below one map"""
+    panels = panels or [(other, pooled, other_label, ylabel, legend_title)]
+    fig = plt.figure(figsize=(ps.COLUMN_IN, 2.1 + 1.0 * len(panels)))
+    gs = fig.add_gridspec(2 + len(panels), 1, height_ratios=[1.25, 0.05] + [1] * len(panels), hspace=0.08, left=0.15, right=0.98,
+                          bottom=0.12 / (1 + 0.4 * (len(panels) - 1)), top=0.995)
+    axm, axs = fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
+    lc = LineCollection(make_segments(x, y), cmap=ps.FRICTION_CMAP, norm=plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX))
+    lc.set_array(friction[:-1]); lc.set_linewidth(3.0); lc.set_capstyle("butt"); axm.add_collection(lc)
+    for s0 in np.arange(0, track_len - 50, 100):   # (the lap end coincides with 0)
+        k = int(s0 // bin_m); axm.plot(x[k], y[k], "o", ms=2.5, color="black", zorder=3)
+        axm.annotate(f"{s0:.0f}", (x[k], y[k]), xytext=(x[k] + 4.5 * offset * nx[k], y[k] + 4.5 * offset * ny[k]), fontsize=6.5,
+                     ha="center", va="center", color="#444444")
+    axm.set_aspect("equal"); axm.autoscale(); axm.margins(0.08); axm.set_axis_off()
+    axs.imshow(friction[np.newaxis, :], extent=[0, track_len, 0, 1], aspect="auto", cmap=ps.FRICTION_CMAP, vmin=ps.FRICTION_MIN,
+               vmax=ps.FRICTION_MAX, interpolation="nearest")
+    axs.set_xlim(0, track_len); axs.set_axis_off()
+    for z in np.unique(np.round(friction[np.isfinite(friction)], 1)):   # zone labels on the strip
+        m = np.isclose(friction, z, atol=0.05); runs_ = np.flatnonzero(np.diff(np.r_[0, m.astype(int), 0]))
+        for a0, a1 in zip(runs_[::2], runs_[1::2]):
+            if (a1 - a0) * bin_m > 60:
+                axs.text(centers[(a0 + a1) // 2], 1.25, rf"$\mu={z:.1f}$", ha="center", va="bottom", fontsize=6.5, color="#444444",
+                         transform=axs.get_xaxis_transform())
+    axes_c = [fig.add_subplot(gs[2 + i], sharex=axs) for i in range(len(panels))]
+    for axc, (other, pooled, other_label, ylabel, legend_title) in zip(axes_c, panels):
+        axc.fill_between(centers, 0, other, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label=other_label)
+        axc.plot(centers, other, color=ps.COLORS["inverse"], lw=0.6)
+        axc.plot(centers, pooled, color=ps.COLORS["pooled"], lw=1.4, label="pooled")
+        axc.axhline(0, color="#222222", lw=0.6)
+        lo = min(0, np.nanmin(other), np.nanmin(pooled)); hi = max(np.nanmax(other), np.nanmax(pooled))
+        axc.set_xlim(0, track_len); axc.set_ylim(1.1 * lo, 1.1 * hi); axc.set_ylabel(ylabel)
+        axc.legend(loc="upper center", bbox_to_anchor=(0.53, 1.0), fontsize=7, handlelength=1.4, borderaxespad=0.2, title=legend_title,
+                   title_fontsize=6.5)
+        axc.grid(axis="y", color="#e3e3e3", lw=0.5); axc.set_axisbelow(True)
+    for axc in axes_c[:-1]:
+        axc.tick_params(axis="x", labelbottom=False)
+    axes_c[-1].set_xlabel("Progress on the track [m]")
+    fig.align_ylabels(axes_c)
+    ps.save(fig, stem)
+
+
 track_map(implied, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX), r"outer ring: implied by the prediction",
           "friction has no effect on the prediction", f"evaluation/02_tracking/implied_friction_{map_name}")
 
@@ -242,37 +285,61 @@ if all("cf_pooled" in d for d in data["pooled"]):
               f"{np.nanmedian(regret[m]) if (m & matters).any() else np.nan:.2f}")
     print(f"selection, lap: matters on {np.mean(matters) * 100:.0f}%, regret median {np.nanmedian(regret):.2f}, below 0.5 on "
           f"{np.mean(regret[matters] < 0.5) * 100:.0f}% of those sections")
-    # along the lap, in cm above the better single-friction prediction (same windows): the worse dataset (what the data choice
-    # is worth) and pooled; a small track map with the friction and the progress marks on top
     stake, cost = 100 * (worst - best), 100 * np.clip(mean["pooled"] - best, 0, None)
     print(f"selection, lap: worse dataset +{np.nanmean(stake):.1f} cm, pooled +{np.nanmean(cost):.1f} cm (lap mean); where it matters "
           f"+{np.nanmean(stake[matters]):.1f} / +{np.nanmean(cost[matters]):.1f} cm")
-    fig = plt.figure(figsize=(ps.COLUMN_IN, 3.1))
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.25, 0.05, 1], hspace=0.06, left=0.13, right=0.98, bottom=0.12, top=0.995)
-    axm, axs, axc = fig.add_subplot(gs[0]), fig.add_subplot(gs[1]), fig.add_subplot(gs[2])
-    lc = LineCollection(make_segments(x, y), cmap=ps.FRICTION_CMAP, norm=plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX))
-    lc.set_array(friction[:-1]); lc.set_linewidth(3.0); lc.set_capstyle("butt"); axm.add_collection(lc)
-    for s0 in np.arange(0, track_len - 50, 100):   # (the lap end coincides with 0)
-        k = int(s0 // bin_m); axm.plot(x[k], y[k], "o", ms=2.5, color="black", zorder=3)
-        axm.annotate(f"{s0:.0f}", (x[k], y[k]), xytext=(x[k] + 4.5 * offset * nx[k], y[k] + 4.5 * offset * ny[k]), fontsize=6.5,
-                     ha="center", va="center", color="#444444")
-    axm.set_aspect("equal"); axm.autoscale(); axm.margins(0.08); axm.set_axis_off()
-    axs.imshow(friction[np.newaxis, :], extent=[0, track_len, 0, 1], aspect="auto", cmap=ps.FRICTION_CMAP, vmin=ps.FRICTION_MIN,
-               vmax=ps.FRICTION_MAX, interpolation="nearest")
-    axs.set_xlim(0, track_len); axs.set_axis_off()
-    for z in levels:   # zone labels on the strip
-        m = np.isclose(friction, z, atol=0.05); runs_ = np.flatnonzero(np.diff(np.r_[0, m.astype(int), 0]))
-        for a0, a1 in zip(runs_[::2], runs_[1::2]):
-            if (a1 - a0) * bin_m > 60:
-                axs.text(centers[(a0 + a1) // 2], 1.25, rf"$\mu={z:.1f}$", ha="center", va="bottom", fontsize=6.5, color="#444444",
-                         transform=axs.get_xaxis_transform())
-    axc.fill_between(centers, 0, stake, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="worse dataset")
-    axc.plot(centers, stake, color=ps.COLORS["inverse"], lw=0.6)
-    axc.plot(centers, cost, color=ps.COLORS["pooled"], lw=1.4, label="pooled")
-    axc.axhline(0, color="#222222", lw=0.6)
-    axc.set_xlim(0, track_len); axc.set_ylim(0, 1.1 * np.nanmax(stake)); axc.set_xlabel("Progress on the track [m]")
-    axc.set_ylabel("Extra prediction\nerror [cm]")
-    axc.legend(loc="upper center", bbox_to_anchor=(0.53, 1.0), fontsize=7, handlelength=1.4, borderaxespad=0.2,
-               title="vs the better dataset", title_fontsize=6.5)
-    axc.grid(axis="y", color="#e3e3e3", lw=0.5); axc.set_axisbelow(True)
-    ps.save(fig, f"evaluation/02_tracking/selection_{map_name}")
+    stake_s, cost_s = stake, cost
+    along_track(stake, cost, "worse dataset", "Extra prediction\nerror [cm]", "vs the better dataset", f"evaluation/02_tracking/selection_{map_name}")
+
+
+# --- same-window prediction (Fig. 1 style), recovery after friction changes, tracking along the lap (l_shape only) -------
+if map_name == "l_shape" and all("cf_pooled" in d for d in data["pooled"]):
+    import matplotlib.patches as mpatches   # noqa: E402
+    cat = lambda key, m_fn: np.concatenate([d[key][m_fn(d)] for d in data["pooled"]])
+    ok = lambda d: (d["lap_n"] >= 1) & np.isfinite(d["cf_pooled"]) & np.isfinite(d["cf_low"]) & np.isfinite(d["cf_high"])
+    zone = lambda z: (lambda d: ok(d) & np.isclose(d["friction"], z, atol=0.05))
+    # rows as in Fig. 1: which data predicts (top to bottom), colour: friction where it is evaluated
+    groups = [(r"$\mu=0.5$ data", "cf_low"), (r"$\mu=1.1$ data", "cf_high"), ("Pooled", "cf_pooled")]
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.2))
+    ps.box_rows(ax, [(label, [(100 * cat(key, zone(z)), ps.friction_color(z)) for z in levels]) for label, key in groups])
+    for label, key in groups:
+        print(f"same window, {label:16s} " + " | ".join(f"mu {z}: median {100 * np.median(cat(key, zone(z))):.1f} cm" for z in levels))
+    ax.set_xlabel("Prediction error [cm]"); ax.set_xlim(left=0)
+    ax.legend(handles=[mpatches.Patch(facecolor=ps.friction_color(z), edgecolor="black", label=rf"$\mu={z:.1f}$") for z in levels],
+              loc="lower right", title="Track zone", title_fontsize=7, frameon=True, framealpha=0.9, edgecolor="none")
+    fig.tight_layout(); ps.save(fig, f"evaluation/02_tracking/prediction_same_window_{map_name}")
+
+    # recovery after a friction change: pooled and the worse dataset above the better one, by steps since the change
+    since_all, excess_p, excess_w = [], [], []
+    for d in data["pooled"]:
+        fr_d = np.round(d["friction"], 1); since = np.zeros(len(fr_d))
+        for k in range(1, len(fr_d)):
+            since[k] = 0 if fr_d[k] != fr_d[k - 1] else since[k - 1] + 1
+        m = ok(d); best_d = np.minimum(d["cf_low"], d["cf_high"])[m]
+        since_all.append(since[m]); excess_p.append((d["cf_pooled"][m] - best_d)); excess_w.append(np.maximum(d["cf_low"], d["cf_high"])[m] - best_d)
+    since_all, excess_p, excess_w = (np.concatenate(v) for v in (since_all, excess_p, excess_w))
+    edges_s = np.arange(0, 31, 2); mid = edges_s[:-1] + 1
+    stat = lambda v: np.array([100 * np.mean(v[(since_all >= a) & (since_all < b)]) for a, b in zip(edges_s[:-1], edges_s[1:])])
+    steady_p, steady_w = 100 * np.mean(excess_p[since_all >= 30]), 100 * np.mean(excess_w[since_all >= 30])
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 1.5))
+    ax.plot(0.1 * mid, stat(excess_w), color=ps.COLORS["inverse"], lw=1.2, marker="o", ms=2.5, label="worse dataset")
+    ax.plot(0.1 * mid, stat(excess_p), color=ps.COLORS["pooled"], lw=1.6, marker="o", ms=3, label="pooled")
+    ax.axhline(steady_p, color=ps.COLORS["pooled"], lw=0.6, ls=(0, (2, 2)))
+    ax.axvline(0.1 * initialization_steps if "initialization_steps" in dir() else 0.5, color="#555555", lw=0.6)
+    ax.text(0.52, ax.get_ylim()[1] * 0.95 if ax.get_ylim()[1] else 1, r"$T_\mathrm{ini}$", fontsize=7, va="top")
+    ax.set_xlabel("Time since the friction change [s]"); ax.set_ylabel("Extra prediction\nerror [cm]")
+    ax.set_xlim(0, 3.0); ax.set_ylim(bottom=0); ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
+    ax.legend(loc="upper right", fontsize=7, title="vs the better dataset", title_fontsize=6.5)
+    print("recovery: pooled " + " ".join(f"{v:.1f}" for v in stat(excess_p)) + f" -> steady {steady_p:.1f} cm; worse dataset steady {steady_w:.1f} cm")
+    fig.tight_layout(); ps.save(fig, f"evaluation/02_tracking/recovery_{map_name}")
+
+    # tracking along the lap relative to the matched run (different runs, same positions; median over 30 laps)
+    te = {a: binned(data[a], "tracking_error")[0] for a in ("pooled", "oracle", "inverse")}
+    k5 = max(int(round(window_m / bin_m)), 1)
+    smooth = lambda a: np.array([np.nanmean(a[np.arange(i - k5 // 2, i - k5 // 2 + k5) % n_bins]) for i in range(n_bins)])
+    dw, dp = smooth(100 * (te["inverse"] - te["oracle"])), smooth(100 * (te["pooled"] - te["oracle"]))
+    print(f"tracking vs matched along the lap: mismatched {np.nanmean(dw):+.1f} cm, pooled {np.nanmean(dp):+.1f} cm (lap mean)")
+    along_track(dw, dp, "mismatched", "Tracking error\nvs matched [cm]", "vs matched data", f"evaluation/02_tracking/tracking_along_{map_name}")
+    along_track(None, None, None, None, None, f"evaluation/02_tracking/along_track_{map_name}",
+                panels=[(stake_s, cost_s, "worse dataset", "Extra prediction\nerror [cm]", "same windows, vs the better dataset"),
+                        (dw, dp, "mismatched", "Tracking error\nvs matched [cm]", "closed loop, vs matched data")])
