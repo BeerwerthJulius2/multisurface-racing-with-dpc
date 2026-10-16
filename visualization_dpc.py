@@ -2,8 +2,8 @@
 evaluation/02_tracking/tracking_error_<map>: tracking error along the lap (median over all evaluated laps of all seeds, band:
 min-max of DPC pooled and NMPC) on the friction profile; for l_shape a second panel with the prediction error of the DPC
 variants (position error of the 10-step prediction vs the positions reached, rms over the horizon).
-evaluation/02_tracking/closed_loop_<map>: as Fig. 1, per controller (rows) and friction (colour) the distribution over all steps
-of the prediction error (DPC) and the tracking error.
+evaluation/02_tracking/closed_loop_<map>: per friction zone and over the lap the controllers side by side (one dot per seed,
+bar at the mean) for the prediction error (DPC) and the tracking error.
 evaluation/02_tracking/implied_friction_<map>: track map, inner ring true friction, outer ring the prediction-based implied
 friction of the pooled DPC (helpers/implied_friction.py), evidence-weighted over all steps of a 10 m window and all laps:
 w = sum <P-B, A-B> / sum |A-B|^2 (A, B: the mu-0.5-only and mu-1.1-only predictions, P: the pooled one), so steps on which
@@ -115,34 +115,37 @@ fig.align_ylabels(axes[:, 0])
 fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
 ps.save(fig, f"evaluation/02_tracking/tracking_error_{map_name}")
 
-# closed loop, in the style of Fig. 1
-rows = [("oracle", "Oracle"), ("inverse", "Inverse"), ("pooled", "Pooled"), ("NMPC", "NMPC")]
-rows = [r for r in rows if r[0] in arms]
-levels = np.unique(np.round(friction[np.isfinite(friction)], 1))
-fig, axes = plt.subplots(1, 2, figsize=(ps.COLUMN_IN, 0.5 + 0.2 * len(rows) * len(levels) + 0.1 * len(rows)), sharey=True)
+# closed loop: per friction zone and over the lap the controllers side by side, one dot per seed, bar at the mean
+# (tracking: per-position median over the seed's laps, averaged over the zone; prediction: median over the zone's steps)
+order = [a for a in ("oracle", "inverse", "pooled", "NMPC") if a in arms]
+levels = list(np.unique(np.round(friction[np.isfinite(friction)], 1)))
+groups = levels + ["lap"]
+
+
+def per_seed(d, key, z):
+    zone = np.ones(n_bins, bool) if z == "lap" else np.isclose(friction, z, atol=0.05)
+    if key == "tracking_error":
+        return np.nanmean(binned([d], key)[0][zone])
+    m = (d["lap_n"] >= 1) & np.isfinite(d[key]) & (True if z == "lap" else np.isclose(d["friction"], z, atol=0.05))
+    return np.median(d[key][m])
+
+
+fig, axes = plt.subplots(2, 1, sharex=True, figsize=(ps.COLUMN_IN, 2.5 if len(groups) <= 4 else 2.7))
 for ax, (key, label) in zip(axes, (("prediction_error", "Prediction error [m]"), ("tracking_error", "Tracking error [m]"))):
-    groups = []
-    for arm, arm_label in rows:
-        boxes = []
-        for z in levels:
-            v = np.concatenate([d[key][(d["lap_n"] >= 1) & np.isclose(d["friction"], z, atol=0.05) & np.isfinite(d[key])]
-                                for d in data[arm] if key in d]) if any(key in d for d in data[arm]) else []
-            boxes.append((v, ps.friction_color(z)))
-        groups.append((arm_label, boxes))
-    ps.box_rows(ax, groups)
-    ax.set_xlabel(label); ax.set_xlim(left=0)
-axes[1].tick_params(axis="y", labelleft=False)
-if "NMPC" in arms:
-    axes[0].text(0.03, -(len(rows) - 1) * (0.2 * len(levels) + 0.1) - 0.2 * (len(levels) - 1) / 2, "not available", fontsize=7,
-                 color="#666666", va="center", transform=axes[0].get_yaxis_transform())
-import matplotlib.patches as mpatches   # noqa: E402
-handles = [mpatches.Patch(facecolor=ps.friction_color(z), edgecolor="black", lw=0.6,
-                          label=rf"$\mu={z:.1f}$" if len(levels) <= 4 else f"{z:.1f}") for z in levels]
-if len(levels) > 4:   # many friction values: "mu" once in front
-    handles.insert(0, mpatches.Patch(visible=False, label=r"$\mu$:"))
-fig.legend(handles=handles, ncol=len(handles), loc="upper center", bbox_to_anchor=(0.55, 1.0), handlelength=1.2 if len(levels) <= 4 else 0.9,
-           columnspacing=0.9 if len(levels) <= 4 else 0.5, handletextpad=0.4, borderaxespad=0.1)
-fig.tight_layout(w_pad=0.5, rect=(0, 0, 1, 1 - 0.16 / fig.get_figheight()))
+    values = {(z, arm): [per_seed(d, key, z) for d in data[arm] if key in d] for z in groups for arm in order}
+    for k, v in sorted(values.items(), key=lambda kv: (str(kv[0][0]), order.index(kv[0][1]))):
+        if v: print(f"{key:16s} {str(k[0]):4s} {k[1]:8s} mean {100 * np.mean(v):5.1f} cm  seeds " + " ".join(f"{100 * x:.1f}" for x in v))
+    finite = [np.mean(v) for (z, arm), v in values.items() if v and arm != "NMPC"]
+    ps.dot_bars(ax, groups, order, values, ymax=1.35 * max(finite))
+    ax.set_ylabel(label)
+axes[1].set_xticklabels([rf"$\mu={z:.1f}$" if len(levels) <= 3 else f"{z:.1f}" for z in levels] + ["lap"])
+if len(levels) > 3:
+    axes[1].set_xlabel(r"friction zone $\mu$")
+handles = [plt.Line2D([], [], color=ps.COLORS[a], lw=1.6, marker="o", ms=2.5, label=ps.LABELS[a]) for a in order]
+fig.legend(handles=handles, ncol=len(order), loc="upper center", bbox_to_anchor=(0.55, 1.0), handlelength=1.4, columnspacing=1.0,
+           borderaxespad=0.1)
+fig.align_ylabels(axes)
+fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.16 / fig.get_figheight()))
 ps.save(fig, f"evaluation/02_tracking/closed_loop_{map_name}")
 
 # implied friction on the track map (evidence-weighted)

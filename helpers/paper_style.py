@@ -43,6 +43,30 @@ def box_rows(ax, groups, gap=0.1, step=0.2):
     return ticks
 
 
+def dot_bars(ax, groups, arms, values, ymax=None):
+    """Grouped comparison as in the hardware figure: per group (x) the arms side by side, one dot per run / seed and a bar
+    at their mean. values[(group, arm)] = list of per-run values (missing or empty: slot left free). Means above ymax are
+    drawn at the top edge with an arrow and their value."""
+    n = len(arms); width = 0.8 / n
+    for gi, g in enumerate(groups):
+        for ai, arm in enumerate(arms):
+            v = np.asarray(values.get((g, arm), []), float)
+            if not len(v):
+                continue
+            x = gi + (ai - (n - 1) / 2) * width; m = v.mean()
+            if ymax is not None and m > ymax:
+                ax.annotate(f"{m:.2g}", xy=(x, ymax), xytext=(x, ymax * 0.84), ha="center", va="top", fontsize=6,
+                            color=COLORS[arm], arrowprops=dict(arrowstyle="->", lw=0.7, color=COLORS[arm]))
+                continue
+            ax.plot([x - 0.42 * width, x + 0.42 * width], [m, m], color=COLORS[arm], lw=1.6, solid_capstyle="butt")
+            ax.scatter(x + np.linspace(-0.2, 0.2, len(v)) * width if len(v) > 1 else [x], v, s=5, color=COLORS[arm],
+                       zorder=3, linewidths=0)
+    ax.set_xticks(range(len(groups))); ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.5, len(groups) - 0.5); ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
+    if ymax is not None:
+        ax.set_ylim(0, ymax)
+
+
 def save(fig, stem):
     """stem.pdf (for \\includegraphics) and stem.svg (for \\includesvg)."""
     fig.savefig(stem + ".pdf", bbox_inches="tight", pad_inches=0.01, metadata={"CreationDate": None})   # no date: same
