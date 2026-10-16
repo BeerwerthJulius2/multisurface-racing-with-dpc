@@ -1,6 +1,7 @@
 """Figure style shared by the paper figures: IEEE column width, Times-like 8 pt text at print size, one colour and line style
 per controller, friction always on coolwarm 0.5 (blue) ... 1.1 (red)."""
 import matplotlib
+import numpy as np
 
 COLUMN_IN = 3.5   # IEEE two-column \columnwidth
 COLORS = {"NMPC": "#222222", "pooled": "#1b7f3b", "oracle": "#e69f00", "inverse": "#7b3294"}
@@ -17,6 +18,29 @@ def apply():
         "axes.spines.right": False, "legend.frameon": False, "pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "path", "svg.hashsalt": "paper",
         "savefig.dpi": 300,
     })
+
+
+def friction_color(mu):
+    from matplotlib import colors
+    import matplotlib.pyplot as plt
+    return colors.to_hex(plt.get_cmap(FRICTION_CMAP)(colors.Normalize(FRICTION_MIN, FRICTION_MAX)(mu)))
+
+
+def box_rows(ax, groups, gap=0.1, step=0.2):
+    """Horizontal boxplots as in Fig. 1 (evaluation/01_prediction): groups = [(label, [(values, colour), ...]), ...] from top
+    to bottom, one box per (values, colour); empty values leave the slot free. Returns the label positions."""
+    y, ticks = 0.0, []
+    for label, boxes in groups:
+        pos = []
+        for values, color in boxes:
+            if len(values):
+                ax.boxplot([values], positions=[-y], vert=False, widths=0.15, patch_artist=True, showfliers=False,
+                           medianprops=dict(color="black"), boxprops=dict(facecolor=color))
+            pos.append(-y); y += step
+        ticks.append(np.mean(pos)); y += gap
+    ax.set_yticks(ticks); ax.set_yticklabels([g[0] for g in groups]); ax.tick_params(axis="y", length=0)
+    ax.set_ylim(-y + gap + step / 2, step / 2); ax.grid(axis="x", alpha=0.3, linewidth=0.5)
+    return ticks
 
 
 def save(fig, stem):

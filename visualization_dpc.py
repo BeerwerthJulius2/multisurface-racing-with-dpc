@@ -2,9 +2,13 @@
 evaluation/02_tracking/tracking_error_<map>: tracking error along the lap (median over all evaluated laps of all seeds, band:
 min-max of DPC pooled and NMPC) on the friction profile; for l_shape a second panel with the prediction error of the DPC
 variants (position error of the 10-step prediction vs the positions reached, rms over the horizon).
+evaluation/02_tracking/closed_loop_<map>: as Fig. 1, per controller (rows) and friction (colour) the distribution over all steps
+of the prediction error (DPC) and the tracking error.
 evaluation/02_tracking/implied_friction_<map>: track map, inner ring true friction, outer ring the prediction-based implied
-friction of the pooled DPC (helpers/implied_friction.py), gray where the two single-friction predictions differ by less than
-3 cm (friction not readable from the prediction).
+friction of the pooled DPC (helpers/implied_friction.py), evidence-weighted over all steps of a 10 m window and all laps:
+w = sum <P-B, A-B> / sum |A-B|^2 (A, B: the mu-0.5-only and mu-1.1-only predictions, P: the pooled one), so steps on which
+friction does not change the prediction carry no weight. Thin outline only: the two predictions differ by less than 1 cm (rms)
+there, friction has no visible effect on the predicted motion.
 usage (repo root): python visualization_dpc.py [l_shape|Nuerburgring] [results dir (evaluation/02_tracking/results)]"""
 import glob
 import json
@@ -27,7 +31,8 @@ map_name = sys.argv[1] if len(sys.argv) > 1 else "l_shape"
 results = sys.argv[2] if len(sys.argv) > 2 else "evaluation/02_tracking/results"
 arms = ("NMPC", "pooled", "oracle", "inverse") if map_name == "l_shape" else ("NMPC", "pooled")
 bin_m = 2.0 if map_name == "l_shape" else 10.0
-readable_m = 0.03
+readable_m = 0.01
+window_m = 10.0
 ps.apply()
 
 with open("configs/config_%s.yaml" % map_name) as file:
@@ -49,7 +54,7 @@ def load_log(name):
         data = json.load(f)
     nan = lambda v: np.array([np.nan if x is None else x for x in v], dtype=float)
     out = {k: nan(data[k]) for k in ("time", "x", "y", "lap_n", "friction", "tracking_error", "track_progress")}
-    for k in ("implied_mu", "implied_dist"):
+    for k in ("implied_mu", "implied_dist", "implied_d_low", "implied_d_high"):
         if k in data:
             out[k] = nan(data[k])
     if "pred_xy" in data:
@@ -110,22 +115,52 @@ fig.align_ylabels(axes[:, 0])
 fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
 ps.save(fig, f"evaluation/02_tracking/tracking_error_{map_name}")
 
-# implied friction on the track map
-pooled = data["pooled"]
-implied = [[] for _ in range(n_bins)]
-for d in pooled:
-    ok = (d["lap_n"] >= 1) & np.isfinite(d["implied_mu"]) & (d["implied_dist"] > readable_m)
-    for p, v in zip(d["track_progress"][ok], d["implied_mu"][ok]):
-        implied[min(int(p // bin_m), n_bins - 1)].append(v)
-implied = np.array([np.mean(v) if len(v) >= 3 else np.nan for v in implied])
-smooth = int(round(10.0 / bin_m)) if map_name == "l_shape" else 1   # display: running mean over 10 m
-if smooth > 1:
-    pad = np.r_[implied[-smooth:], implied, implied[:smooth]]
-    run = np.array([np.nanmean(pad[i - smooth // 2:i + smooth // 2 + 1]) if np.isfinite(pad[i]) else np.nan for i in range(smooth, smooth + n_bins)])
-    implied = run
+# closed loop, in the style of Fig. 1
+rows = [("oracle", "Oracle"), ("inverse", "Inverse"), ("pooled", "Pooled"), ("NMPC", "NMPC")]
+rows = [r for r in rows if r[0] in arms]
+levels = np.unique(np.round(friction[np.isfinite(friction)], 1))
+fig, axes = plt.subplots(1, 2, figsize=(ps.COLUMN_IN, 0.5 + 0.2 * len(rows) * len(levels) + 0.1 * len(rows)), sharey=True)
+for ax, (key, label) in zip(axes, (("prediction_error", "Prediction error [m]"), ("tracking_error", "Tracking error [m]"))):
+    groups = []
+    for arm, arm_label in rows:
+        boxes = []
+        for z in levels:
+            v = np.concatenate([d[key][(d["lap_n"] >= 1) & np.isclose(d["friction"], z, atol=0.05) & np.isfinite(d[key])]
+                                for d in data[arm] if key in d]) if any(key in d for d in data[arm]) else []
+            boxes.append((v, ps.friction_color(z)))
+        groups.append((arm_label, boxes))
+    ps.box_rows(ax, groups)
+    ax.set_xlabel(label); ax.set_xlim(left=0)
+axes[1].tick_params(axis="y", labelleft=False)
+if "NMPC" in arms:
+    axes[0].text(0.03, -(len(rows) - 1) * (0.2 * len(levels) + 0.1) - 0.2 * (len(levels) - 1) / 2, "not available", fontsize=7,
+                 color="#666666", va="center", transform=axes[0].get_yaxis_transform())
+import matplotlib.patches as mpatches   # noqa: E402
+handles = [mpatches.Patch(facecolor=ps.friction_color(z), edgecolor="black", lw=0.6,
+                          label=rf"$\mu={z:.1f}$" if len(levels) <= 4 else f"{z:.1f}") for z in levels]
+if len(levels) > 4:   # many friction values: "mu" once in front
+    handles.insert(0, mpatches.Patch(visible=False, label=r"$\mu$:"))
+fig.legend(handles=handles, ncol=len(handles), loc="upper center", bbox_to_anchor=(0.55, 1.0), handlelength=1.2 if len(levels) <= 4 else 0.9,
+           columnspacing=0.9 if len(levels) <= 4 else 0.5, handletextpad=0.4, borderaxespad=0.1)
+fig.tight_layout(w_pad=0.5, rect=(0, 0, 1, 1 - 0.16 / fig.get_figheight()))
+ps.save(fig, f"evaluation/02_tracking/closed_loop_{map_name}")
+
+# implied friction on the track map (evidence-weighted)
+num, den, cnt = np.zeros(n_bins), np.zeros(n_bins), np.zeros(n_bins)
+for d in data["pooled"]:
+    ok = (d["lap_n"] >= 1) & np.isfinite(d["implied_dist"])
+    b = np.minimum((d["track_progress"][ok] // bin_m).astype(int), n_bins - 1)
+    D, dA, dB = d["implied_dist"][ok], d["implied_d_low"][ok], d["implied_d_high"][ok]
+    np.add.at(num, b, (dB ** 2 + D ** 2 - dA ** 2) / 2)   # <P-B, A-B> from the three position distances
+    np.add.at(den, b, D ** 2); np.add.at(cnt, b, 1)
+k = max(int(round(window_m / bin_m)), 1)
+win = lambda a: np.array([a[np.arange(i - k // 2, i - k // 2 + k) % n_bins].sum() for i in range(n_bins)])
+num_w, den_w, cnt_w = win(num), win(den), win(cnt)
+w = np.clip(num_w / np.maximum(den_w, 1e-12), 0, 1)
+implied = np.where(np.sqrt(den_w / np.maximum(cnt_w, 1)) > readable_m, 0.5 * w + 1.1 * (1 - w), np.nan)
 for z in np.unique(np.round(friction[np.isfinite(friction)], 1)):
     m = np.isclose(friction, z, atol=0.05)
-    print(f"true mu {z:.1f}: implied {np.nanmean(implied[m]):.2f} (readable on {np.mean(np.isfinite(implied[m])) * 100:.0f}% of the sections)")
+    print(f"true mu {z:.1f}: implied {np.nanmean(implied[m]):.2f} (identifiable on {np.mean(np.isfinite(implied[m])) * 100:.0f}% of the sections)")
 
 x = np.interp(centers, waypoints[:, 0], waypoints[:, 1])
 y = np.interp(centers, waypoints[:, 0], waypoints[:, 2])
@@ -143,7 +178,7 @@ def make_segments(x, y):
 
 fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.7 if map_name == "l_shape" else 3.1))
 norm_c = plt.Normalize(vmin=ps.FRICTION_MIN, vmax=ps.FRICTION_MAX)
-ax.plot(x + offset * nx, y + offset * ny, color="#c8c8c8", lw=2.6, solid_capstyle="butt")   # not readable
+ax.plot(x + offset * nx, y + offset * ny, color="#555555", lw=0.5)   # outline: friction not identifiable
 for sign, values in ((-1, friction), (1, implied)):
     lc = LineCollection(make_segments(x + sign * offset * nx, y + sign * offset * ny), cmap=ps.FRICTION_CMAP, norm=norm_c)
     lc.set_array(np.ma.masked_invalid(values[:-1]))
@@ -167,6 +202,9 @@ for row in range(n_rows):
 ax.set_aspect("equal")
 ax.autoscale()
 ax.set_axis_off()
+if np.isnan(implied).any():
+    ax.plot([], [], color="#555555", lw=0.5, label="friction has no effect on the prediction")
+    ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
 cbar = fig.colorbar(lc, ax=ax, orientation="horizontal", fraction=0.05, pad=0.03, aspect=35)
 cbar.set_label(r"Friction $\mu$ (inner ring: track, outer ring: implied by the DPC prediction)")
 cbar.outline.set_linewidth(0.4)
