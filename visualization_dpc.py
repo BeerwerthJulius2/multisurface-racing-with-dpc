@@ -29,6 +29,7 @@ from helpers.eval_metrics import prediction_error, prediction_offset
 
 map_name = sys.argv[1] if len(sys.argv) > 1 else "l_shape"
 results = sys.argv[2] if len(sys.argv) > 2 else "evaluation/02_tracking/results"
+fig_dir = os.environ.get("FIG_DIR", "evaluation/02_tracking")   # where the figures go
 arms = ("NMPC", "pooled", "oracle", "inverse") if map_name == "l_shape" else ("NMPC", "pooled")
 bin_m = 2.0 if map_name == "l_shape" else 10.0
 readable_m = 0.01
@@ -90,12 +91,31 @@ def friction_background(ax):
 
 
 # tracking error (and prediction error) along the lap
-panels = [("tracking_error", "Tracking error [m]", arms)]
-if map_name == "l_shape":
-    panels.append(("prediction_error", "Prediction error [m]", arms[1:]))
+fig_arms = tuple(os.environ["FIG_ARMS"].split(",")) if os.environ.get("FIG_ARMS") else arms
+panels = [("tracking_error", "Tracking error [m]", fig_arms)]
+if map_name == "l_shape" and "oracle" in fig_arms:
+    panels.append(("prediction_error", "Prediction error [m]", tuple(a for a in fig_arms if a != "NMPC")))
+# as the hardware figure: tracking error of the mismatched and the pooled DPC relative to the matched one (default when both runs exist)
+relative = map_name == "l_shape" and all(data.get(a) for a in ("oracle", "inverse")) and os.environ.get("FIG_RELATIVE", "1") == "1"
+if relative:
+    panels.append(("relative", "Tracking error\nvs matched [cm]", ()))
 fig, axes = plt.subplots(len(panels), 1, sharex=True, figsize=(ps.COLUMN_IN, 1.45 + 1.15 * (len(panels) - 1)), squeeze=False)
 for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
-    friction_background(ax)
+    if key != "relative":   # the relative panel stays white (as the hardware figure), the zones are shown above it
+        friction_background(ax)
+    if key == "relative":
+        k5 = max(int(round(window_m / bin_m)), 1)
+        smooth = lambda a: np.array([np.nanmean(a[np.arange(i - k5 // 2, i - k5 // 2 + k5) % n_bins]) for i in range(n_bins)])
+        te = {a: binned(data[a], "tracking_error")[0] for a in ("pooled", "oracle", "inverse")}
+        dw, dp = smooth(100 * (te["inverse"] - te["oracle"])), smooth(100 * (te["pooled"] - te["oracle"]))
+        ax.fill_between(centers, 0, dw, color=ps.COLORS["inverse"], alpha=0.35, lw=0, label="DPC mismatched")
+        ax.plot(centers, dw, color=ps.COLORS["inverse"], lw=0.6)
+        ax.plot(centers, dp, color=ps.COLORS["pooled"], lw=1.4)
+        ax.axhline(0, color="#222222", lw=0.6); ax.set_ylabel(ylabel); ax.set_xlim(0, track_len)
+        ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
+        ax.set_ylim(1.15 * min(0, np.nanmin(dw), np.nanmin(dp)), 1.15 * max(np.nanmax(dw), np.nanmax(dp)))
+        print(f"vs matched along the lap: mismatched {np.nanmean(dw):+.1f} cm, pooled {np.nanmean(dp):+.1f} cm (lap mean)")
+        continue
     for arm in panel_arms:
         med, lo, hi = binned(data[arm], key)
         if arm in ("NMPC", "pooled") and key == "tracking_error":
@@ -113,12 +133,14 @@ if map_name == "Nuerburgring":   # largest deviation: the hairpin, twice the cur
     axes[0, 0].annotate("hairpin", xy=(centers[k], binned(data["pooled"], "tracking_error")[0][k]), xytext=(centers[k] + 350, 1.2),
                         fontsize=7, arrowprops=dict(arrowstyle="-", lw=0.5, color="#444444"), va="center")
 handles, labels = axes[0, 0].get_legend_handles_labels()
-fig.legend(handles, labels, ncol=len(arms), loc="upper center", bbox_to_anchor=(0.5, 1.0), handlelength=2.0, columnspacing=0.9,
+if relative:
+    h2, l2 = axes[-1, 0].get_legend_handles_labels(); handles, labels = handles + h2, labels + l2
+fig.legend(handles, labels, ncol=len(handles), loc="upper center", bbox_to_anchor=(0.5, 1.0), handlelength=1.8, columnspacing=0.8,
            borderaxespad=0.1)
 axes[-1, 0].set_xlabel("Progress on the track [m]")
 fig.align_ylabels(axes[:, 0])
 fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
-ps.save(fig, f"evaluation/02_tracking/tracking_error_{map_name}")
+ps.save(fig, f"{fig_dir}/tracking_error_{map_name}")
 
 # closed loop as dumbbells: per friction zone (rows) the bar from matched to mismatched data, pooled as the large dot, NMPC
 # as a diamond; means over the seeds in cm (tracking: per-position median over the seed's laps, averaged over the zone;
@@ -153,7 +175,7 @@ for ax, (key, label) in zip(axes, (("prediction_error", "Prediction error [cm]")
     ax.set_xlabel(label)
 ps.arm_legend(fig, order)
 fig.tight_layout(w_pad=0.8, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
-ps.save(fig, f"evaluation/02_tracking/closed_loop_{map_name}")
+ps.save(fig, f"{fig_dir}/closed_loop_{map_name}")
 
 # implied friction on the track map (evidence-weighted)
 num, den, cnt = np.zeros(n_bins), np.zeros(n_bins), np.zeros(n_bins)
@@ -261,7 +283,7 @@ def along_track(other, pooled, other_label, ylabel, legend_title, stem, panels=N
 
 
 track_map(implied, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX), r"outer ring: implied by the prediction",
-          "friction has no effect on the prediction", f"evaluation/02_tracking/implied_friction_{map_name}")
+          "friction has no effect on the prediction", f"{fig_dir}/implied_friction_{map_name}")
 
 # selection map: on the same windows, does the pooled prediction match the better or the worse single-friction prediction
 # (errors vs the positions reached; regret 0 = as accurate as the better dataset, 1 = as the worse one)
@@ -289,7 +311,7 @@ if all("cf_pooled" in d for d in data["pooled"]):
     print(f"selection, lap: worse dataset +{np.nanmean(stake):.1f} cm, pooled +{np.nanmean(cost):.1f} cm (lap mean); where it matters "
           f"+{np.nanmean(stake[matters]):.1f} / +{np.nanmean(cost[matters]):.1f} cm")
     stake_s, cost_s = stake, cost
-    along_track(stake, cost, "worse dataset", "Extra prediction\nerror [cm]", "vs the better dataset", f"evaluation/02_tracking/selection_{map_name}")
+    along_track(stake, cost, "worse dataset", "Extra prediction\nerror [cm]", "vs the better dataset", f"{fig_dir}/selection_{map_name}")
 
 
 # --- same-window prediction (Fig. 1 style), recovery after friction changes, tracking along the lap (l_shape only) -------
@@ -307,7 +329,7 @@ if map_name == "l_shape" and all("cf_pooled" in d for d in data["pooled"]):
     ax.set_xlabel("Prediction error [cm]"); ax.set_xlim(left=0)
     ax.legend(handles=[mpatches.Patch(facecolor=ps.friction_color(z), edgecolor="black", label=rf"$\mu={z:.1f}$") for z in levels],
               loc="lower right", title="Track zone", title_fontsize=7, frameon=True, framealpha=0.9, edgecolor="none")
-    fig.tight_layout(); ps.save(fig, f"evaluation/02_tracking/prediction_same_window_{map_name}")
+    fig.tight_layout(); ps.save(fig, f"{fig_dir}/prediction_same_window_{map_name}")
 
     # recovery after a friction change: pooled and the worse dataset above the better one, by steps since the change
     since_all, excess_p, excess_w = [], [], []
@@ -331,7 +353,7 @@ if map_name == "l_shape" and all("cf_pooled" in d for d in data["pooled"]):
     ax.set_xlim(0, 3.0); ax.set_ylim(bottom=0); ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
     ax.legend(loc="upper right", fontsize=7, title="vs the better dataset", title_fontsize=6.5)
     print("recovery: pooled " + " ".join(f"{v:.1f}" for v in stat(excess_p)) + f" -> steady {steady_p:.1f} cm; worse dataset steady {steady_w:.1f} cm")
-    fig.tight_layout(); ps.save(fig, f"evaluation/02_tracking/recovery_{map_name}")
+    fig.tight_layout(); ps.save(fig, f"{fig_dir}/recovery_{map_name}")
 
     # tracking along the lap relative to the matched run (different runs, same positions; median over 30 laps)
     te = {a: binned(data[a], "tracking_error")[0] for a in ("pooled", "oracle", "inverse")}
@@ -339,7 +361,7 @@ if map_name == "l_shape" and all("cf_pooled" in d for d in data["pooled"]):
     smooth = lambda a: np.array([np.nanmean(a[np.arange(i - k5 // 2, i - k5 // 2 + k5) % n_bins]) for i in range(n_bins)])
     dw, dp = smooth(100 * (te["inverse"] - te["oracle"])), smooth(100 * (te["pooled"] - te["oracle"]))
     print(f"tracking vs matched along the lap: mismatched {np.nanmean(dw):+.1f} cm, pooled {np.nanmean(dp):+.1f} cm (lap mean)")
-    along_track(dw, dp, "mismatched", "Tracking error\nvs matched [cm]", "vs matched data", f"evaluation/02_tracking/tracking_along_{map_name}")
-    along_track(None, None, None, None, None, f"evaluation/02_tracking/along_track_{map_name}",
+    along_track(dw, dp, "mismatched", "Tracking error\nvs matched [cm]", "vs matched data", f"{fig_dir}/tracking_along_{map_name}")
+    along_track(None, None, None, None, None, f"{fig_dir}/along_track_{map_name}",
                 panels=[(stake_s, cost_s, "worse dataset", "Extra prediction\nerror [cm]", "same windows, vs the better dataset"),
                         (dw, dp, "mismatched", "Tracking error\nvs matched [cm]", "closed loop, vs matched data")])

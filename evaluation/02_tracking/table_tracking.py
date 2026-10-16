@@ -73,5 +73,5 @@ tex = r"""\begin{table}[!t]
 \end{tabular}
 \end{table}
 """
-out = "evaluation/02_tracking/table_tracking.tex"
+out = os.path.join(os.environ.get("FIG_DIR", "evaluation/02_tracking"), "table_tracking.tex")
 open(out, "w").write(tex); print(tex); print("written", out)
