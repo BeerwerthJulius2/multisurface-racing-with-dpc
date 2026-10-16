@@ -2,8 +2,8 @@
 evaluation/02_tracking/tracking_error_<map>: tracking error along the lap (median over all evaluated laps of all seeds, band:
 min-max of DPC pooled and NMPC) on the friction profile; for l_shape a second panel with the prediction error of the DPC
 variants (position error of the 10-step prediction vs the positions reached, rms over the horizon).
-evaluation/02_tracking/closed_loop_<map>: per friction zone and over the lap the controllers side by side (one dot per seed,
-bar at the mean) for the prediction error (DPC) and the tracking error.
+evaluation/02_tracking/closed_loop_<map>: per friction zone and over the lap (rows) a dumbbell from the matched to the mismatched
+DPC with pooled DPC as the large dot and NMPC as a diamond, for the prediction error (DPC) and the tracking error.
 evaluation/02_tracking/implied_friction_<map>: track map, inner ring true friction, outer ring the prediction-based implied
 friction of the pooled DPC (helpers/implied_friction.py), evidence-weighted over all steps of a 10 m window and all laps:
 w = sum <P-B, A-B> / sum |A-B|^2 (A, B: the mu-0.5-only and mu-1.1-only predictions, P: the pooled one), so steps on which
@@ -120,11 +120,13 @@ fig.align_ylabels(axes[:, 0])
 fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
 ps.save(fig, f"evaluation/02_tracking/tracking_error_{map_name}")
 
-# closed loop: per friction zone and over the lap the controllers side by side, one dot per seed, bar at the mean
-# (tracking: per-position median over the seed's laps, averaged over the zone; prediction: median over the zone's steps)
+# closed loop as dumbbells: per friction zone (rows) the bar from matched to mismatched data, pooled as the large dot, NMPC
+# as a diamond; means over the seeds in cm (tracking: per-position median over the seed's laps, averaged over the zone;
+# prediction: median over the zone's steps)
 order = [a for a in ("pooled", "oracle", "inverse", "NMPC") if a in arms]
 levels = list(np.unique(np.round(friction[np.isfinite(friction)], 1)))
 groups = levels + ["lap"]
+row_names = [rf"$\mu={z:.1f}$" for z in levels] + ["lap"]
 
 
 def per_seed(d, key, z):
@@ -135,22 +137,22 @@ def per_seed(d, key, z):
     return np.median(d[key][m])
 
 
-fig, axes = plt.subplots(2, 1, sharex=True, figsize=(ps.COLUMN_IN, 2.5 if len(groups) <= 4 else 2.7))
-for ax, (key, label) in zip(axes, (("prediction_error", "Prediction error [m]"), ("tracking_error", "Tracking error [m]"))):
-    values = {(z, arm): [per_seed(d, key, z) for d in data[arm] if key in d] for z in groups for arm in order}
-    for k, v in sorted(values.items(), key=lambda kv: (str(kv[0][0]), order.index(kv[0][1]))):
-        if v: print(f"{key:16s} {str(k[0]):4s} {k[1]:8s} mean {100 * np.mean(v):5.1f} cm  seeds " + " ".join(f"{100 * x:.1f}" for x in v))
-    finite = [np.mean(v) for (z, arm), v in values.items() if v and arm != "NMPC"]
-    ps.dot_bars(ax, groups, order, values, ymax=1.35 * max(finite))
-    ax.set_ylabel(label)
-axes[1].set_xticklabels([rf"$\mu={z:.1f}$" if len(levels) <= 3 else f"{z:.1f}" for z in levels] + ["lap"])
-if len(levels) > 3:
-    axes[1].set_xlabel(r"friction zone $\mu$")
-handles = [plt.Line2D([], [], color=ps.COLORS[a], lw=1.6, marker="o", ms=2.5, label=ps.LABELS[a]) for a in order]
-fig.legend(handles=handles, ncol=len(order), loc="upper center", bbox_to_anchor=(0.55, 1.0), handlelength=1.4, columnspacing=1.0,
-           borderaxespad=0.1)
-fig.align_ylabels(axes)
-fig.tight_layout(h_pad=0.4, rect=(0, 0, 1, 1 - 0.16 / fig.get_figheight()))
+fig, axes = plt.subplots(1, 2, sharey=True, figsize=(ps.COLUMN_IN, 0.55 + 0.27 * len(groups)))
+for ax, (key, label) in zip(axes, (("prediction_error", "Prediction error [cm]"), ("tracking_error", "Tracking error [cm]"))):
+    values = {}
+    for z, name in zip(groups, row_names):
+        for arm in order:
+            v = [per_seed(d, key, z) for d in data[arm] if key in d]
+            if v:
+                values[(name, arm)] = 100 * float(np.mean(v))
+                print(f"{key:16s} {str(z):4s} {arm:8s} {100 * np.mean(v):5.1f} cm (seeds {100 * min(v):.1f}-{100 * max(v):.1f})")
+    dpc_max = max(v for (r, a), v in values.items() if a != "NMPC")
+    nmpc_max = max([v for (r, a), v in values.items() if a == "NMPC"], default=0)
+    xmax = 1.15 * max(dpc_max, nmpc_max) if nmpc_max < 1.6 * dpc_max else 1.3 * dpc_max
+    ps.dumbbell(ax, row_names, values, xmax=xmax)
+    ax.set_xlabel(label)
+ps.arm_legend(fig, order)
+fig.tight_layout(w_pad=0.8, rect=(0, 0, 1, 1 - 0.17 / fig.get_figheight()))
 ps.save(fig, f"evaluation/02_tracking/closed_loop_{map_name}")
 
 # implied friction on the track map (evidence-weighted)
@@ -240,31 +242,37 @@ if all("cf_pooled" in d for d in data["pooled"]):
               f"{np.nanmedian(regret[m]) if (m & matters).any() else np.nan:.2f}")
     print(f"selection, lap: matters on {np.mean(matters) * 100:.0f}%, regret median {np.nanmedian(regret):.2f}, below 0.5 on "
           f"{np.mean(regret[matters] < 0.5) * 100:.0f}% of those sections")
-    # rings in cm on one scale: what the wrong dataset costs (worse - better) and what pooling costs (pooled - better)
+    # along the lap, in cm above the better single-friction prediction (same windows): the worse dataset (what the data choice
+    # is worth) and pooled; a small track map with the friction and the progress marks on top
     stake, cost = 100 * (worst - best), 100 * np.clip(mean["pooled"] - best, 0, None)
-    print(f"selection, lap: wrong-dataset cost {np.nanmean(stake[matters]):.1f} cm, pooling cost {np.nanmean(cost[matters]):.1f} cm "
-          f"(mean over the sections where it matters)")
-    from matplotlib.colors import LinearSegmentedColormap   # noqa: E402
-    cmap_cm = LinearSegmentedColormap.from_list("cost", ["#f4f4f4", "#c9a6d3", ps.COLORS["inverse"], "#3b1247"])
-    vmax = np.ceil(np.nanpercentile(stake[matters], 95))
-    fig = plt.figure(figsize=(ps.COLUMN_IN, 3.0))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 0.035], hspace=0.08, wspace=0.25, left=0.04, right=0.96, bottom=0.12, top=0.99)
-    ax = fig.add_subplot(gs[0, :])
-    rings = []
-    for k_off, values, cmap, nrm in ((-1, friction, ps.FRICTION_CMAP, plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)),
-                                     (1, np.where(matters, stake, np.nan), cmap_cm, plt.Normalize(0, vmax)),
-                                     (2.6, np.where(matters, cost, np.nan), cmap_cm, plt.Normalize(0, vmax))):
-        X, Y = x + k_off * offset * nx, y + k_off * offset * ny
-        ax.plot(X, Y, color="#555555", lw=0.4) if k_off > 0 else None
-        lc = LineCollection(make_segments(X, Y), cmap=cmap, norm=nrm); lc.set_array(np.ma.masked_invalid(values[:-1]))
-        lc.set_linewidth(2.4); lc.set_capstyle("butt"); ax.add_collection(lc); rings.append(lc)
-    ax.set_aspect("equal"); ax.autoscale(); ax.set_axis_off()
-    ax.plot([], [], color="#555555", lw=0.4, label=f"datasets predict alike (< {100 * selection_m:.0f} cm)")
-    ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
-    ax.annotate("inner: track friction\nmiddle: wrong dataset costs\nouter: pooling costs", xy=(0.99, 0.99), xycoords="axes fraction",
-                ha="right", va="top", fontsize=7)
-    for col, (lc, label, ticks) in enumerate(((rings[0], r"track friction $\mu$", [0.5, 0.8, 1.1]),
-                                              (rings[1], "extra prediction error [cm]", None))):
-        cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1, col]), orientation="horizontal", ticks=ticks)
-        cbar.set_label(label, labelpad=1, fontsize=7); cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
+    print(f"selection, lap: worse dataset +{np.nanmean(stake):.1f} cm, pooled +{np.nanmean(cost):.1f} cm (lap mean); where it matters "
+          f"+{np.nanmean(stake[matters]):.1f} / +{np.nanmean(cost[matters]):.1f} cm")
+    fig = plt.figure(figsize=(ps.COLUMN_IN, 3.1))
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.25, 0.05, 1], hspace=0.06, left=0.13, right=0.98, bottom=0.12, top=0.995)
+    axm, axs, axc = fig.add_subplot(gs[0]), fig.add_subplot(gs[1]), fig.add_subplot(gs[2])
+    lc = LineCollection(make_segments(x, y), cmap=ps.FRICTION_CMAP, norm=plt.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX))
+    lc.set_array(friction[:-1]); lc.set_linewidth(3.0); lc.set_capstyle("butt"); axm.add_collection(lc)
+    for s0 in np.arange(0, track_len - 50, 100):   # (the lap end coincides with 0)
+        k = int(s0 // bin_m); axm.plot(x[k], y[k], "o", ms=2.5, color="black", zorder=3)
+        axm.annotate(f"{s0:.0f}", (x[k], y[k]), xytext=(x[k] + 4.5 * offset * nx[k], y[k] + 4.5 * offset * ny[k]), fontsize=6.5,
+                     ha="center", va="center", color="#444444")
+    axm.set_aspect("equal"); axm.autoscale(); axm.margins(0.08); axm.set_axis_off()
+    axs.imshow(friction[np.newaxis, :], extent=[0, track_len, 0, 1], aspect="auto", cmap=ps.FRICTION_CMAP, vmin=ps.FRICTION_MIN,
+               vmax=ps.FRICTION_MAX, interpolation="nearest")
+    axs.set_xlim(0, track_len); axs.set_axis_off()
+    for z in levels:   # zone labels on the strip
+        m = np.isclose(friction, z, atol=0.05); runs_ = np.flatnonzero(np.diff(np.r_[0, m.astype(int), 0]))
+        for a0, a1 in zip(runs_[::2], runs_[1::2]):
+            if (a1 - a0) * bin_m > 60:
+                axs.text(centers[(a0 + a1) // 2], 1.25, rf"$\mu={z:.1f}$", ha="center", va="bottom", fontsize=6.5, color="#444444",
+                         transform=axs.get_xaxis_transform())
+    axc.fill_between(centers, 0, stake, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="worse dataset")
+    axc.plot(centers, stake, color=ps.COLORS["inverse"], lw=0.6)
+    axc.plot(centers, cost, color=ps.COLORS["pooled"], lw=1.4, label="pooled")
+    axc.axhline(0, color="#222222", lw=0.6)
+    axc.set_xlim(0, track_len); axc.set_ylim(0, 1.1 * np.nanmax(stake)); axc.set_xlabel("Progress on the track [m]")
+    axc.set_ylabel("Extra prediction\nerror [cm]")
+    axc.legend(loc="upper center", bbox_to_anchor=(0.53, 1.0), fontsize=7, handlelength=1.4, borderaxespad=0.2,
+               title="vs the better dataset", title_fontsize=6.5)
+    axc.grid(axis="y", color="#e3e3e3", lw=0.5); axc.set_axisbelow(True)
     ps.save(fig, f"evaluation/02_tracking/selection_{map_name}")
