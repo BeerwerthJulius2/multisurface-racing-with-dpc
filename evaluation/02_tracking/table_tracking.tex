@@ -1,0 +1,17 @@
+\begin{table}[!t]
+\caption{Tracking and prediction error in cm on the L-shape track per friction zone and over the lap, and tracking error over the lap on the Nürburgring (tracking: median over 30 laps from 3 seeds per track position, averaged over the zone or lap; prediction: rms position error over the 10-step horizon, median over all steps of the zone or lap). Best value per column in bold.}
+\label{tab:tracking}
+\centering
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{l cccc ccc c}
+\hline
+ & \multicolumn{4}{c}{Tracking error} & \multicolumn{3}{c}{Prediction error} & Nürb. \\
+ & $\mu$\,0.5 & 0.8 & 1.1 & lap & $\mu$\,0.5 & 0.8 & 1.1 & lap \\
+\hline
+NMPC & 19.3 & \textbf{14.6} & \textbf{12.1} & 15.6 & -- & -- & -- & 8.4 \\
+DPC pooled & 12.1 & 15.4 & 14.0 & \textbf{13.7} & 3.5 & 8.5 & 4.8 & 8.8 \\
+DPC oracle & 14.5 & 16.0 & 13.0 & 14.4 & \textbf{3.0} & \textbf{8.2} & \textbf{4.0} & -- \\
+DPC inverse & \textbf{11.6} & 14.8 & 19.2 & 15.0 & 6.1 & 8.6 & 8.6 & -- \\
+\hline
+\end{tabular}
+\end{table}

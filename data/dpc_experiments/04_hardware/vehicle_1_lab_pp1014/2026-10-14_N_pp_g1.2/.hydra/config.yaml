@@ -1,0 +1,13 @@
+experiment:
+  control_freq_hz: 50
+  simulation_freq_hz: null
+data:
+  source: lab
+  bag_path: /home/julius/dev/ros2-workspace-lab-dpc/src/collect-data/rosbag/collection_20261014_173156
+  map_name: Lab Reduced
+  vehicle_id: 1
+  state_topic: /lab/vehicle_1/vehicleState
+  input_source: sent_command
+  representation: v0
+  planner_node_name: ''
+  planner_topic: ''

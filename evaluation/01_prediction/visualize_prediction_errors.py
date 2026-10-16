@@ -8,11 +8,16 @@ Usage:
 """
 import json
 import argparse
+import os
+import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import colors as mcolors
+
+sys.path.insert(0, os.getcwd())
+from helpers import paper_style as ps  # noqa: E402  (run from the repo root)
 
 MU_VALUES = {
     "mu_03": 0.3,
@@ -90,6 +95,7 @@ def build_rows(results, mu_colors):
 
 def plot_results(results, output_path=None):
     #set_latex_style()
+    ps.apply()
     cmap_friction = plt.get_cmap("coolwarm")
     norm_c = mcolors.Normalize(vmin=0.5, vmax=1.1)  # match your other plot exactly
 
@@ -119,7 +125,7 @@ def plot_results(results, output_path=None):
             colors.append(r[2])
             y += 0.2
 
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.9))
 
     for i, (pos, errors, color) in enumerate(zip(y_positions, data, colors)):
         bp = ax.boxplot(
@@ -139,10 +145,10 @@ def plot_results(results, output_path=None):
     #ax.set_xscale('log')
     #ax.set_xlabel("RMSE (log scale)", fontsize=9)
     ax.set_yticks(y_positions)
-    ax.set_yticklabels(labels, fontsize=7.5)
-    ax.set_xlabel("RMSE", fontsize=9)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("RMSE")
     ax.set_xlim(0, None)
-    ax.tick_params(axis='x', labelsize=8)
+    ax.tick_params(axis='y', length=0)
 
     '''
     # Section labels on the right
@@ -169,19 +175,16 @@ def plot_results(results, output_path=None):
     # Legend
     legend_patches = [mpatches.Patch(facecolor=c, edgecolor="black", label=MU_LABELS[k])
                       for k, c in MU_COLORS.items()]
-    ax.legend(handles=legend_patches, loc="upper right", title="Eval surface",
-              fontsize=7, title_fontsize=7.5, framealpha=0.9)
+    ax.legend(handles=legend_patches, loc="upper right", title="Eval surface", title_fontsize=7, frameon=True,
+              framealpha=0.9, edgecolor="none")
 
     ax.grid(axis='x', alpha=0.3, linewidth=0.5)
     fig.tight_layout()
-    fig.subplots_adjust(right=0.75)
 
     if output_path:
         fig.savefig(output_path, dpi=300, bbox_inches="tight")
         print(f"Saved to {output_path}")
-    plt.show()
-    fig.savefig("evaluation/01_prediction/prediction_error.pdf", bbox_inches="tight", pad_inches=0.01)
-    fig.savefig("evaluation/01_prediction/prediction_error.svg", bbox_inches="tight")
+    ps.save(fig, "evaluation/01_prediction/prediction_error")
 
 
 if __name__ == "__main__":
