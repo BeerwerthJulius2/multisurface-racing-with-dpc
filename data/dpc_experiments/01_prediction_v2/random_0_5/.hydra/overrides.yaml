@@ -1,0 +1,4 @@
+- +experiment=vehicle_collect_data
+- experiment.friction.mu=0.5
+- seed=31415
+- experiment.duration_sec=1000

@@ -1,197 +1,58 @@
-"""
-Plot prediction error results from saved JSON.
-Horizontal boxplots, stacked vertically — fits double-column paper layout.
-
-Usage:
-    python plot_prediction_results.py results/prediction/prediction_results.json
-    python plot_prediction_results.py results/prediction/prediction_results.json --output fig.pdf
-"""
-import json
+"""Fig. 1 of the paper (evaluation/01_prediction/prediction_error.pdf/.svg): open-loop prediction error on held-out windows of the
+random-excitation data (data/dpc_experiments/01_prediction_v2, mu 0.5 and 1.1), with 300 contextually sampled trajectories of the
+pooled, the matched and the mismatched data (prediction_results_random.json from prediction_error_eval.py with
+PRED_DATA=data/dpc_experiments/01_prediction_v2 PRED_LABELS=0:mu_05,1:mu_11 PRED_CACHE=0 PRED_TINI=10
+PRED_KEYS=matched_contextual,mismatched_contextual,pooled_contextual PRED_OUT=evaluation/01_prediction/prediction_results_random.json).
+One panel per evaluation friction, the datasets as rows (pooled, matched, mismatched from the top); dashed: matched median.
+Boxes: quartiles and median, whiskers 10th to 90th percentile.
+usage (repo root): python evaluation/01_prediction/visualize_prediction_errors.py evaluation/01_prediction/prediction_results_random.json"""
 import argparse
+import json
 import os
 import sys
 
 import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+import numpy as np
 from matplotlib import colors as mcolors
 
 sys.path.insert(0, os.getcwd())
 from helpers import paper_style as ps  # noqa: E402  (run from the repo root)
 
-MU_VALUES = {
-    "mu_03": 0.3,
-    "mu_07": 0.7,
-    "mu_10": 1.0,
-}
-
-MU_LABELS = {
-    "mu_10": r"$\mu=1.0$",
-    "mu_07": r"$\mu=0.7$",
-    "mu_03": r"$\mu=0.3$",
-}
+ROWS = [("pooled_contextual", "pooled"), ("matched_contextual", "matched"), ("mismatched_contextual", "mismatched")]   # top to bottom
+XMAX = 100
 
 
-def load_results(path):
-    with open(path) as f:
-        return json.load(f)
-
-def set_latex_style(column_width_pt=252.0, fraction=1.0, subplots=(1, 1)):
-    inches_per_pt = 1.0 / 72.27
-
-    fig_width_in = column_width_pt * inches_per_pt * fraction
-    fig_height_in = fig_width_in * 0.9 * (subplots[0] / subplots[1])
-
-    matplotlib.rcParams.update({
-        "text.usetex": True,
-        "font.family": "serif",
-        "font.serif": ["Computer Modern Roman"],
-        "axes.labelsize": 10,
-        "font.size": 10,
-        "legend.fontsize": 9,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
-        "axes.titlesize": 10,
-        "figure.figsize": (fig_width_in, fig_height_in),
-        "pgf.texsystem": "pdflatex",
-        "pgf.rcfonts": False,
-    })
-
-
-def build_rows(results, mu_colors):
-    """
-    Returns list of (label, errors, color) or None for spacers.
-    Order is bottom-to-top.
-    Color indicates evaluation friction.
-    Labels follow the five settings described in the paper.
-    """
-    rows = []
-
-    def add_block(label, data):
-        names = ["mu_10", "mu_07", "mu_03"]
-        for idx, name in enumerate(names):
-            row_label = label if idx == 1 else ""
-            rows.append((row_label, data[name], mu_colors[name]))
-
-    add_block("(5) Contextual", results["test_5_mixed_contextual"])
-    rows.append(None)
-
-    add_block("(4) Random", results["test_4_mixed_random"])
-    rows.append(None)
-
-    add_block("(3) Pooled", results["test_3_mixed_full"])
-    rows.append(None)
-
-    t2 = results["test_2_cross"]
-    rows.append(("", t2["mu_03→mu_10"], mu_colors["mu_10"]))
-    #rows.append(("(2) Cross", t2["mu_10→mu_03"], mu_colors["mu_03"]))
-    rows.append(("(2) Cross", t2["mu_10→mu_03"], mu_colors["mu_03"]))
-
-    rows.append(None)
-
-    add_block("(1) Self", results["test_1_self"])
-
-    return rows
-
-def plot_results(results, output_path=None):
-    #set_latex_style()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", help="prediction_results_random.json")
+    args = parser.parse_args()
     ps.apply()
-    cmap_friction = plt.get_cmap("coolwarm")
-    norm_c = mcolors.Normalize(vmin=0.5, vmax=1.1)  # match your other plot exactly
-
-    MU_COLORS = {
-        key: mcolors.to_hex(cmap_friction(norm_c(val)))
-        for key, val in MU_VALUES.items()
-    }
-
-    rows = build_rows(results, MU_COLORS)
-
-    config = results.get("config", {})
-    num_traj = config.get("num_traj", "?")
-
-    # Compute y positions with gaps for spacers
-    y_positions = []
-    labels = []
-    colors = []
-    data = []
-    y = 0
-    for r in rows:
-        if r is None:
-            y += 0.1
-        else:
-            y_positions.append(y)
-            labels.append(r[0])
-            data.append(r[1])
-            colors.append(r[2])
-            y += 0.2
-
-    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.9))
-
-    for i, (pos, errors, color) in enumerate(zip(y_positions, data, colors)):
-        bp = ax.boxplot(
-            [errors],
-            positions=[pos],
-            vert=False,
-            #widths=0.3,
-            patch_artist=True,
-            showfliers=False,
-            #flierprops=dict(marker="o", markersize=2.5, markerfacecolor=color, markeredgecolor=color, alpha=0.5),
-            medianprops=dict(color="black"),
-            boxprops=dict(facecolor=color),
-            #whiskerprops=dict(color=color, linewidth=0.8),
-            #capprops=dict(color=color, linewidth=0.8),
-        )
-
-    #ax.set_xscale('log')
-    #ax.set_xlabel("RMSE (log scale)", fontsize=9)
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels(labels)
-    ax.set_xlabel("RMSE")
-    ax.set_xlim(0, None)
-    ax.tick_params(axis='y', length=0)
-
-    '''
-    # Section labels on the right
-    sections = [
-        (f"Contextual (n={num_traj})", 0, 3),
-        (f"Random (n={num_traj})", 3, 6),
-        ("Full dataset", 6, 9),
-        ("Cross-prediction", 9, 11),
-        ("Self-prediction", 11, 14),
-    ]
-    for section_name, start, end in sections:
-        mid_y = (y_positions[start] + y_positions[end - 1]) / 2
-        ax.annotate(
-            section_name,
-            xy=(1.02, mid_y),
-            xycoords=("axes fraction", "data"),
-            fontsize=7.5,
-            fontweight="bold",
-            va="center",
-            ha="left",
-        )
-    '''
-
-    # Legend
-    legend_patches = [mpatches.Patch(facecolor=c, edgecolor="black", label=MU_LABELS[k])
-                      for k, c in MU_COLORS.items()]
-    ax.legend(handles=legend_patches, loc="upper right", title="Eval surface", title_fontsize=7, frameon=True,
-              framealpha=0.9, edgecolor="none")
-
-    ax.grid(axis='x', alpha=0.3, linewidth=0.5)
-    fig.tight_layout()
-
-    if output_path:
-        fig.savefig(output_path, dpi=300, bbox_inches="tight")
-        print(f"Saved to {output_path}")
+    r = json.load(open(args.path))
+    # the two evaluated frictions from the result file, e.g. labels {"0": "mu_05", "1": "mu_11"} -> ("mu_05", 0.5), ("mu_11", 1.1)
+    SURFACES = [(n, int(n[3:]) / 10) for n in r["config"]["labels"].values()]
+    cmap = plt.get_cmap(ps.FRICTION_CMAP); norm = mcolors.Normalize(ps.FRICTION_MIN, ps.FRICTION_MAX)
+    fig, axes = plt.subplots(1, 2, sharey=True, figsize=(ps.COLUMN_IN, 1.3))
+    pos = [2, 1, 0]
+    for ax, (key, mu) in zip(axes, SURFACES):
+        data = [[100 * v for v in r[k][key]] for k, _ in ROWS]
+        ax.boxplot(data, positions=pos, vert=False, widths=0.6, patch_artist=True, showfliers=False, whis=(10, 90),
+                   medianprops=dict(color="black", lw=1.0), boxprops=dict(facecolor=mcolors.to_hex(cmap(norm(mu))), lw=0.6),
+                   whiskerprops=dict(lw=0.6), capprops=dict(lw=0.6))
+        ax.axvline(np.median(data[1]), color="#444444", lw=0.6, ls=(0, (2, 2)), zorder=0)   # matched median
+        ax.set_title(r"$\mu=%.1f$" % mu, fontsize=8, pad=3)
+        ax.set_xlim(0, XMAX); ax.set_xticks(range(0, XMAX + 1, 20)); ax.tick_params(axis="y", length=0)
+        ax.grid(axis="x", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
+        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+        print(f"mu {mu}: " + ", ".join(f"{lab} {np.median(d):.1f}" for (_, lab), d in zip(ROWS, data)) + " cm (median)")
+    axes[0].set_yticks(pos); axes[0].set_yticklabels([lab for _, lab in ROWS])
+    fig.tight_layout(w_pad=0.6, rect=(0, 0.12, 1, 1))
+    p0, p1 = axes[0].get_position(), axes[1].get_position()
+    fig.text((p0.x0 + p1.x1) / 2, p0.y0 - 0.17, "Position error of the prediction, rms over the horizon [cm]", ha="center", va="top",
+             fontsize=8)
     ps.save(fig, "evaluation/01_prediction/prediction_error")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path", type=str, help="Path to prediction_results.json")
-    parser.add_argument("--output", type=str, default=None, help="Save figure to path (e.g. fig.pdf)")
-    args = parser.parse_args()
-
-    results = load_results(args.path)
-    plot_results(results, output_path=args.output)
+    main()

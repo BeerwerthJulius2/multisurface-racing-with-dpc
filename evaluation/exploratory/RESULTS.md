@@ -1,7 +1,7 @@
 # Exploratory results, 2026-09-25/27
 
 Control experiments on the implicit-friction-selection claim, run while preparing the
-ECC submission. Exploratory: not (yet) part of the paper's evaluation pipeline.
+conference submission. Exploratory: not (yet) part of the paper's evaluation pipeline.
 All runs use the `l_shape` track, 2-3 laps, first lap discarded.
 
 ## 1. Uniform friction: is the selection driven by friction or by the track?

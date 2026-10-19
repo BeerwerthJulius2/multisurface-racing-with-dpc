@@ -1,7 +1,7 @@
 """Paper figures from the evaluation logs (evaluation/02_tracking/run_eval.sh):
 evaluation/02_tracking/tracking_error_<map>: tracking error along the lap of DPC (pooled data) and NMPC (median over all evaluated
-laps of all seeds, band: min-max) on the friction profile; for l_shape below it the tracking error of DPC with the mismatched
-and with the pooled data relative to DPC with the matched data (oracle / inverse runs, as the hardware figure).
+laps of all seeds, band: min-max) on the friction profile; for l_shape below it the tracking error and the prediction error of
+DPC with the mismatched and with the pooled data relative to DPC with the matched data (oracle / inverse runs, as the hardware figure).
 FIG_ARMS=NMPC,pooled,oracle,inverse: all four in the upper panel and a prediction-error panel; FIG_DIR: output folder.
 evaluation/02_tracking/implied_friction_<map>: track map, inner ring true friction, outer ring the prediction-based implied
 friction of the pooled DPC (helpers/implied_friction.py), evidence-weighted over all steps of a 10 m window and all laps:
@@ -101,23 +101,26 @@ if map_name == "l_shape" and "oracle" in fig_arms:
 relative = map_name == "l_shape" and all(data.get(a) for a in ("oracle", "inverse")) and os.environ.get("FIG_RELATIVE", "1") == "1"
 if relative:
     panels.append(("relative", "Tracking error\nvs matched [cm]", ()))
-fig, axes = plt.subplots(len(panels), 1, sharex=True, figsize=(ps.COLUMN_IN, 1.45 + 1.15 * (len(panels) - 1)), squeeze=False)
+    panels.append(("relative_pred", "Prediction error\nvs matched [cm]", ()))
+fig, axes = plt.subplots(len(panels), 1, sharex=True, figsize=(ps.COLUMN_IN, 1.3 + 1.1 * (len(panels) - 1)), squeeze=False)
 for ax, (key, ylabel, panel_arms) in zip(axes[:, 0], panels):
-    if key != "relative":   # the relative panel stays white (as the hardware figure), the zones are shown above it
-        friction_background(ax, labels=ax is axes[0, 0])
-    if key == "relative":
+    friction_background(ax, labels=ax is axes[0, 0])   # zone labels in the upper panel only
+    if key in ("relative", "relative_pred"):   # tracking / prediction error of mismatched and pooled relative to matched
+        metric = "tracking_error" if key == "relative" else "prediction_error"
         k5 = max(int(round(window_m / bin_m)), 1)
         smooth = lambda a: np.array([np.nanmean(a[np.arange(i - k5 // 2, i - k5 // 2 + k5) % n_bins]) for i in range(n_bins)])
-        te = {a: binned(data[a], "tracking_error")[0] for a in ("pooled", "oracle", "inverse")}
+        te = {a: binned(data[a], metric)[0] for a in ("pooled", "oracle", "inverse")}
         dw, dp = smooth(100 * (te["inverse"] - te["oracle"])), smooth(100 * (te["pooled"] - te["oracle"]))
         ax.fill_between(centers, 0, dw, color=ps.COLORS["inverse"], alpha=0.35, lw=0, label="DPC mismatched")
         ax.plot(centers, dw, color=ps.COLORS["inverse"], lw=0.6)
         ax.plot(centers, dp, color=ps.COLORS["pooled"], lw=1.4, label="DPC pooled")
-        ax.legend(loc="upper left", ncol=2, handlelength=1.8, columnspacing=0.8, borderaxespad=0.2)
+        if key == "relative":
+            h, l = ax.get_legend_handles_labels()   # pooled first, as in the tables
+            ax.legend(h[::-1], l[::-1], loc="upper left", ncol=2, handlelength=1.8, columnspacing=0.8, borderaxespad=0.2)
         ax.axhline(0, color="#222222", lw=0.6); ax.set_ylabel(ylabel); ax.set_xlim(0, track_len)
         ax.grid(axis="y", color="#e3e3e3", lw=0.5); ax.set_axisbelow(True)
         ax.set_ylim(1.15 * min(0, np.nanmin(dw), np.nanmin(dp)), 1.15 * max(np.nanmax(dw), np.nanmax(dp)))
-        print(f"vs matched along the lap: mismatched {np.nanmean(dw):+.1f} cm, pooled {np.nanmean(dp):+.1f} cm (lap mean)")
+        print(f"{metric} vs matched along the lap: mismatched {np.nanmean(dw):+.1f} cm, pooled {np.nanmean(dp):+.1f} cm (lap mean)")
         continue
     for arm in panel_arms:
         med, lo, hi = binned(data[arm], key)
@@ -179,7 +182,7 @@ def make_segments(x, y):
 def track_map(outer, outer_label, outline_label, stem):
     """track map: inner ring the true friction, outer ring `outer` on the same friction colour scale (thin outline where it is
     NaN), one shared colour bar"""
-    fig = plt.figure(figsize=(ps.COLUMN_IN, 2.5 if map_name == "l_shape" else 3.3))
+    fig = plt.figure(figsize=(ps.COLUMN_IN, 2.3 if map_name == "l_shape" else 3.3))
     gs = fig.add_gridspec(2, 1, height_ratios=[1, 0.035], hspace=0.08, left=0.04, right=0.96, bottom=0.12, top=0.99)
     ax = fig.add_subplot(gs[0])
     ax.plot(x + offset * nx, y + offset * ny, color="#555555", lw=0.5)
@@ -200,11 +203,13 @@ def track_map(outer, outer_label, outline_label, stem):
     ax.set_aspect("equal"); ax.autoscale(); ax.set_axis_off()
     if np.isnan(outer).any():
         ax.plot([], [], color="#555555", lw=0.5, label=outline_label)
-        ax.legend(loc="lower left", fontsize=7, handlelength=1.5, borderaxespad=0)
+        # in the empty lower left of the figure, above the colour bar, so that the label does not cross the track
+        fig.legend(*ax.get_legend_handles_labels(), loc="lower left", bbox_to_anchor=(0.02, 0.22), fontsize=7, handlelength=1.5,
+                   borderaxespad=0, frameon=False)
     cbar = fig.colorbar(lc, cax=fig.add_subplot(gs[1]), orientation="horizontal", ticks=[0.5, 0.8, 1.1])
     cbar.set_label(r"friction $\mu$ (inner ring: track, outer ring: " + outer_label + ")", labelpad=1, fontsize=7)
     cbar.outline.set_linewidth(0.4); cbar.ax.tick_params(labelsize=6.5, length=2)
     ps.save(fig, stem)
 
 
-track_map(implied, "implied by the prediction", "friction has no effect on the prediction", f"{fig_dir}/implied_friction_{map_name}")
+track_map(implied, "implied by the prediction", "friction has no effect\non the prediction", f"{fig_dir}/implied_friction_{map_name}")

@@ -1,6 +1,6 @@
 # Minimal paper changes from the exploratory results
 
-Target: ECC, with the hardware experiments. Keep the contribution as it is; adjust the
+Target: the conference submission, with the hardware experiments. Keep the contribution as it is; adjust the
 claims so they match what section 1-6 of `RESULTS.md` actually shows. Line numbers refer
 to `paper/root.tex` as of commit 9282449.
 
@@ -45,7 +45,7 @@ to `paper/root.tex` as of commit 9282449.
    LPV-DeePC (Verhoek, Toth, Haesaert et al. - verify the exact references): they assume
    a measured scheduling signal, we have none. Also kernel/Koopman DeePC (Lian & Jones)
    and the regularization-as-robustness reading (Coulson/Dorfler/Markovsky). Currently
-   Section III cites none of this and an ECC reviewer will notice.
+   Section III cites none of this and a reviewer will notice.
 
 9. **One paragraph of negative results** (pre-empts three obvious reviewer suggestions):
    group sparsity 48%, persistence prior 22%, explicit hard selection 0% and diverging,
@@ -54,7 +54,7 @@ to `paper/root.tex` as of commit 9282449.
 
 ## Space
 
-ECC is 6 pages and the hardware results have priority.
+The page limit is 6 pages and the hardware results have priority.
 
 - Compress the uniform-friction experiment to one paragraph plus a two-line table
   (straights vs corners). The hardware runs are themselves uniform-friction tests.

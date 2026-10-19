@@ -1,0 +1,231 @@
+save_outputs: true
+seed: 31415
+progress_bar:
+  value: true
+  time_interval_s: 20
+  bar_width: 50
+controller:
+  preprocess:
+    controller_configs:
+    - num_inputs
+    - num_outputs
+    - prediction_horizon
+    - initialization_horizon
+    - normalization
+    - alignment
+    - control_affine
+    remove_duplicates: false
+    filter_data: false
+    stride: 1
+    acceleration_filter:
+      enabled: false
+      threshold: 0.5
+      metric: max
+      threshold_type: lower
+      keep_extremes: false
+      per_dimension: false
+  preprocess_options:
+    save_psd_analysis: true
+    save_directional_diagnostics: true
+    save_visualizations: true
+    save_full_preprocess_log: true
+    plot_distribution: true
+    matrix_diagnostics: true
+    visualization_subfolder_name: analysis
+    num_workers: 24
+    debug_buckets: false
+    debug_hashing: false
+    debug_rehash: false
+  path_sampling:
+    online_sampling: true
+    sampling: contextual
+    distribution:
+      name: gaussian
+      params:
+        reference_score: 0.04
+    percentile_scale: 6
+    clip_lower: 1.0
+    clip_upper: 90.0
+    evidence:
+      enabled: false
+      neighbours: 20
+      ridge: 0.1
+      scale: auto
+      forgetting: 0.0
+      floor: 0.01
+    sampling_debug: true
+    visualize_once: true
+  num_traj: 200
+  lambda_g: 1.1
+  lambda_sigma: 1000
+  sampling: contextual
+  initialization_horizon: 10
+  prediction_horizon: 10
+  r_k:
+  - - 0.1
+    - 0.0
+  - - 0.0
+    - 0.01
+  r_dk:
+  - - 0.1
+    - 0.0
+  - - 0.0
+    - 0.1
+  q_k:
+  - - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 1.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.001
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 0.01
+  q_fk:
+  - - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 1.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.001
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 0.01
+  num_inputs: 2
+  num_outputs: 4
+  input_names:
+  - accl
+  - delta
+  output_names:
+  - pose_x
+  - pose_y
+  - linear_vel_x
+  - pose_theta
+  u_min:
+  - -3.0
+  - -0.4189
+  u_max:
+  - 3.0
+  - 0.4189
+  y_min:
+  - -1000000000.0
+  - -1000000000.0
+  - -5.0
+  - -3.141592653589793
+  y_max:
+  - 1000000000.0
+  - 1000000000.0
+  - 10.0
+  - 3.141592653589793
+  action_interface:
+    steering_mode: delta_to_steerv
+    dt: 0.1
+    steerv_min: -3.141592653589793
+    steerv_max: 3.141592653589793
+  normalization: true
+  alignment: true
+  alignment_conf:
+    type: vehicle
+    set_origin:
+    - 0
+    - 0
+    set_orientation: 0
+    plot: false
+  control_affine: false
+  persistently_exciting: false
+  debug_plot:
+    enabled: true
+    blocking: false
+    raw: false
+  debug_LQR: false
+  debug_matrix_rank: false
+  debug_plot_mae: false
+dataset:
+  path: data/vehicle/2026-03-06_16-59-04_+experiment=vehicle_collect_data,experiment.duration_sec=1000
+  merge_data: true
+  alignment:
+    enabled: true
+    method: pose
+  normalization:
+    enabled: false
+    method: z_score
+  online_trajectory_update:
+    enabled: false
+    method: append
+system:
+  system_name: vehicle
+  simulation:
+    backend: f1tenth_multibody
+evaluation:
+  enabled: true
+  discard_first: 10
+  reference_alignment: next
+experiment:
+  name: VehicleCollectData
+  _target_: experiment.vehicle.collect_data.VehicleCollectData
+  duration_sec: 1000
+  timestep: 0.1
+  simulation_timestep: 0.001
+  control_freq_hz: 10.0
+  simulation_freq_hz: 1000.0
+  dlk: 2.0
+  track:
+    name: SaoPauloFullscale
+    root: scenario/vehicle
+    start_idx: 0
+  render_mode: null
+  control_input: accl
+  observation_config:
+    type: dynamic_state
+  friction:
+    dynamic: false
+    mu: 1.1
+  dataset_root: data/vehicle/new_data
+  save_format: npy
+  log_freq_hz: 10
+  measurement_noise: false
+  noise:
+    position_std: 0.05
+    velocity_std: 0.05
+    heading_std: 0.01
+  random_policy:
+    update_every_n_steps: 100
+    steer_mean_range:
+    - -0.4189
+    - 0.4189
+    vel_mean_range:
+    - 8.0
+    - 25.0
+    steer_sigma: 0.1
+    vel_sigma: 0.5
+    max_accl: 11.5
+    min_accl: -45.0
+    max_steerv: 3.14159
+  load_data: false
+  allow_no_data: true
+  save_flight: false
+  save_stats: false
+  plot_trajectories: false
+  save_data_columns:
+  - t
+  - agent id
+  - accel
+  - steering
+  - x
+  - 'y'
+  - v
+  - yaw

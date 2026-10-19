@@ -57,14 +57,14 @@ for a in arms:
     nbr = "%.1f" % (100 * np.nanmean(N[a])) if a in N else "--"
     rows.append(f"{names[a]} & " + " & ".join(cells[:4]) + " & " + " & ".join(cells[4:]) + f" & {nbr} \\\\")
 tex = r"""\begin{table}[!t]
-\caption{Tracking and prediction error in cm (30 laps, 3 seeds; best per column in bold).}
+\caption{Closed-loop tracking and prediction error in cm (mean over 30 laps; best per column in bold).}
 \label{tab:tracking}
 \centering
 \setlength{\tabcolsep}{3.2pt}
 \begin{tabular}{l cccc ccc c}
 \hline
- & \multicolumn{4}{c}{Tracking error, L-shape} & \multicolumn{3}{c}{Prediction error} & Tracking \\
- & \multicolumn{3}{c}{zone $\mu$} & & \multicolumn{3}{c}{zone $\mu$} & Nürburgring \\
+ & \multicolumn{4}{c}{Tracking error} & \multicolumn{3}{c}{Prediction error} & Nürburgring \\
+ & \multicolumn{3}{c}{zone $\mu$} & & \multicolumn{3}{c}{zone $\mu$} & tracking \\
 \cline{2-4}\cline{6-8}
  & 0.5 & 0.8 & 1.1 & lap & 0.5 & 0.8 & 1.1 & lap \\
 \hline
