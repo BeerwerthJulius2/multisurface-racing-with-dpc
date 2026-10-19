@@ -17,10 +17,10 @@ cd "$(dirname "$0")/../.."
 export PYTHONPATH=$PWD/external/dpc:$PWD/external/nmpc
 export ACADOS_SOURCE_DIR=${ACADOS_SOURCE_DIR:-$HOME/dev/acados} LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-$HOME/dev/acados/lib}
 COMMON="DPC_MAP_NAME=$MAP DPC_NUMBER_OF_LAPS=$LAPS DPC_VELOCITY_MAX=20 DPC_ABORT_ERROR=5"
-# DPC setting tuned for pooled tracking (lambda_g 5, lambda_sigma 50, speed weight 300, reference spaced by the profile speed)
-Q="[[10.1,0,0,0],[0,10.1,0,0],[0,0,300,0],[0,0,0,20.1]]"
+# DPC setting tuned for pooled tracking: deepc controller config multisurface_sim (lambda_g 5, lambda_sigma 50, speed weight 300);
+# reference spaced by the profile speed
 DPC="DPC_HEADLESS=1 DPC_DATA_DIR=data/dpc_experiments/02_tracking_v2 DPC_REF_SPACING=profile"
-DPC="$DPC DPC_HYDRA_OVERRIDES=controller.lambda_g=5;controller.lambda_sigma=50;controller.q_k=$Q;controller.q_fk=$Q"
+DPC="$DPC DPC_HYDRA_OVERRIDES=controller=multisurface_sim"
 mkdir -p $OUT
 for s in $SEEDS; do
   for a in $ARMS; do

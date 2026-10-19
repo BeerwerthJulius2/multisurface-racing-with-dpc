@@ -7,9 +7,8 @@ set -ef
 OUT=evaluation/02_tracking/results/infeasible_reference
 cd "$(dirname "$0")/../.."
 export PYTHONPATH=$PWD/external/dpc:$PWD/external/nmpc
-Q="[[10.1,0,0,0],[0,10.1,0,0],[0,0,300,0],[0,0,0,20.1]]"
 DPC="DPC_HEADLESS=1 DPC_DATA_DIR=data/dpc_experiments/02_tracking_v2 DPC_REF_SPACING=profile"
-DPC="$DPC DPC_HYDRA_OVERRIDES=controller.lambda_g=5;controller.lambda_sigma=50;controller.q_k=$Q;controller.q_fk=$Q"
+DPC="$DPC DPC_HYDRA_OVERRIDES=controller=multisurface_sim"   # lambda_g 5, lambda_sigma 50, speed weight 300
 mkdir -p $OUT
 for mu in 0.5 1.1; do for v in 1.0 1.1; do for a in pooled oracle inverse; do
   [ "$mu" = 1.1 ] && [ "$v" = 1.0 ] && continue
