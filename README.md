@@ -17,7 +17,7 @@ acados is built in `~/dev/acados` (else set `ACADOS_SOURCE_DIR`, `LD_LIBRARY_PAT
 | Fig. 1 prediction | `data/dpc_experiments/01_prediction` | `evaluation/01_prediction/prediction_results.json` | `DPC_prediction_error.py`; `evaluation/01_prediction/visualize_prediction_errors.py <results.json>` |
 | Fig. 2 tracking (+ matched / mismatched data), Fig. 3 implied friction, Table I | `data/dpc_experiments/02_tracking_v2` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh`; `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
 | Nürburgring (Table I; figure optional) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled`; `visualization_dpc.py Nuerburgring` |
-| Hardware figure | `data/dpc_experiments/04_hardware` (README) | `evaluation/04_hardware/hardware_runs.json` | lab runs (ros2-workspace-lab-dpc); `extract_lab_runs.py <workspace>`; `evaluation/04_hardware/plot_hardware.py` |
+| Hardware figure, Table II | `data/dpc_experiments/04_hardware` (README; data, run configs and logs) | `evaluation/04_hardware/hardware_runs.json` | `evaluation/04_hardware/extract_lab_runs.py`; `evaluation/04_hardware/plot_hardware.py` |
 
 "matched" / "mismatched" = the oracle / inverse runs (DPC_ORACLE=1 / inverse: sampling restricted to the dataset of the true /
 the other friction). NMPC baseline: Pacejka parameters and g-g limits in `external/nmpc/Config/RoboRacer-Multibody` (midpoint

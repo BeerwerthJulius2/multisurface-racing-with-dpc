@@ -1,26 +1,30 @@
-"""Per-run results of the CPM Lab evaluation (2026-10-15, 18 runs: 2 tyre sets x pooled / oracle / inverse x 3) from the lab
-logs of the ros2-workspace-lab-dpc workspace -> hardware_runs.json (committed; the raw logs, 77 MB, stay in the lab workspace).
+"""Per-run results of the CPM Lab evaluation (2026-10-15, 18 runs: 2 tyre sets x pooled / oracle / inverse x 3) from the run logs
+in data/dpc_experiments/04_hardware/eval_runs (resolved controller config + the logged arrays the evaluation needs; the full
+logs, 77 MB, stay in the lab workspace) -> hardware_runs.json.
 Lateral error: rms distance to the raceline (and |distance| every 4th step); lap time from the mean progress speed (and the
 time of each complete lap); prediction error: position error of the controller's prediction vs the measured trajectory, rms
 over the horizon (and at its last step), median over the run (and every 4th step); track position of those steps.
 Tyre set by time (slippery block before 12:12, then normal); arm from controller.path_sampling.oracle_labels.
-usage (lab environment: ROS 2 jazzy, the dpc venv): extract_lab_runs.py <workspace> [out.json]"""
+Uses the deepc version that ran on the car (external/dpc, 16fe5f4) for its normalisation / alignment of the predictions.
+usage (repo root, the venv of the README): python evaluation/04_hardware/extract_lab_runs.py [out.json]"""
 import sys, glob, os, json, numpy as np, logging, warnings
 warnings.filterwarnings("ignore"); logging.disable(logging.CRITICAL)
-WS = sys.argv[1]; OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "hardware_runs.json")
-sys.path = [p for p in sys.path if "src/deepc" not in p]; sys.path.insert(0, WS + "/src/deepc")
+HERE = os.path.dirname(os.path.abspath(__file__)); DATA = os.path.join(os.getcwd(), "data/dpc_experiments/04_hardware")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "hardware_runs.json")
+sys.path.insert(0, os.path.join(os.getcwd(), "external/dpc"))
 from omegaconf import OmegaConf, open_dict
 from dataset.trajectory_dataset import TrajectoryDataset
 from controller.vehicle_dpc.vehicle_dpc import VehicleDPC
-sys.path.insert(0, WS + "/src/dpc-controller/src"); from raceline import load_raceline, project
+sys.path.insert(0, HERE); from raceline import load_raceline, project   # copy of the lab node's raceline module
 out = []; ctl = None
-for d in sorted(glob.glob(WS + "/src/dpc-controller/log/2026-10-15T1[12]-*")):
+for d in sorted(glob.glob(DATA + "/eval_runs/2026-10-15T1[12]-*")):
     run = os.path.basename(d); tyre = "slippery" if run[11:16] < "12-12" else "normal"
-    cfg = OmegaConf.load(d + "/vehicle_1/config.yaml"); cr = cfg.controller
+    cfg = OmegaConf.load(d + "/config.yaml"); cr = cfg.controller
     orc = cr.path_sampling.get("oracle_labels"); data = "pooled" if orc is None else ("slippery" if 7 in list(orc) else "normal")
     arm = "pooled" if data == "pooled" else ("oracle" if data == tyre else "inverse")
-    z = np.load(glob.glob(d + "/vehicle_1/results_*.npz")[0]); t = z["experiment/t"] - z["experiment/t"][0]; st = z["experiment/state"].astype(float)
-    rl = load_raceline(WS + "/src/dpc-controller/config/" + cr.raceline_file, cr.raceline_a_lat); li = None; lat = []; s_un = []; acc = 0; sp = None
+    z = {k.replace("__", "/"): v for k, v in np.load(d + "/log.npz").items()}
+    t = z["experiment/t"] - z["experiment/t"][0]; st = z["experiment/state"].astype(float)
+    rl = load_raceline(os.path.join(DATA, "raceline", os.path.basename(cr.raceline_file)), cr.raceline_a_lat); li = None; lat = []; s_un = []; acc = 0; sp = None
     for k in range(len(t)):
         s0, li, dd = project(rl, st[k, 0], st[k, 1], li); lat.append(dd)
         if sp is not None:
@@ -31,7 +35,9 @@ for d in sorted(glob.glob(WS + "/src/dpc-controller/log/2026-10-15T1[12]-*")):
     k0 = np.ceil(s_un[m][0] / rl["length"]); marks = rl["length"] * np.arange(k0, np.floor(s_un[m][-1] / rl["length"]) + 1)
     t_marks = np.interp(marks, s_un[m], t[m]); laps = np.diff(t_marks)               # complete laps inside the window
     if ctl is None:
-        with open_dict(cfg): cfg.dataset = cfg.controller.dataset; cfg.experiment.simulation_freq_hz = None
+        with open_dict(cfg):   # the pooled lab data set (copy of the lab workspace's data/vehicle_1 = pp1014)
+            cfg.controller.dataset.path = os.path.join(DATA, "vehicle_1_lab_pp1014"); cfg.dataset = cfg.controller.dataset
+            cfg.experiment.simulation_freq_hz = None
         class L:
             def log_dpc_step(self, *a, **k): pass
         ctl = VehicleDPC(data=TrajectoryDataset(cfg), cfg=cfg, data_logger=L())
