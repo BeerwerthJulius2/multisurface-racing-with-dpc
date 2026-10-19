@@ -17,10 +17,12 @@ Numbers for the text (cm unless stated):
 - Prediction, random-excitation data (Fig. 1, T_ini 10 = 1 s as on the hardware, median rms over the horizon, mu 0.5 / 1.1,
   1996 windows each): pooled 18.8 / 24.6, matched 12.7 / 23.6, mismatched 42.5 / 51.7; paired median vs matched: pooled +4.6 / +1.4,
   mismatched +26.2 / +22.5; pooled closer to matched than to mismatched on 73 / 70% of the windows.
-  With T_ini 5 (the closed-loop simulation's window): pooled 22.4 / 27.0, matched 12.6 / 27.6, mismatched 48.0 / 56.5.
+  With T_ini 5 (the closed-loop simulation's window; `prediction_results_random_tini5.json`): pooled 22.4 / 27.0, matched
+  12.6 / 27.6, mismatched 48.0 / 56.5.
   Why pooled lags matched at mu 0.5 (200-window diagnostic): the active set is balanced (50-60% own regime), but the weight on the
   own regime (1'g) is only 0.65 (T_ini 5) / 0.73 (T_ini 10); lambda_sigma x100 or 1000 columns help little, T_ini 20 not more.
-  Grip use (share of samples above 70% of mu g): random 68% (mu 0.5) / 57% (mu 1.1), raceline 6% (mu 0.5) / 0% (mu 1.1).
+  Grip use (share of samples above 70% of mu g, `01_prediction/grip_usage.py`): random 68% (mu 0.5) / 57% (mu 1.1), raceline
+  6% (mu 0.5) / 0% (mu 1.1).
   The earlier random data in 01_prediction (labelled mu 0.3 / 1.0; their stored configs all say mu 1.1, so the friction is
   undocumented) separate by speed (median 29.6 vs 13.8 m/s): weight on the own regime 0.99 / 0.93; pooled 17.6 / 18.4, matched
   13.2 / 17.2, mismatched 58.7 / 63.0 (T_ini 5).

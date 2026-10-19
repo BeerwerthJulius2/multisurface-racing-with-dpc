@@ -15,11 +15,11 @@ acados is built in `~/dev/acados` (else set `ACADOS_SOURCE_DIR`, `LD_LIBRARY_PAT
 
 | Paper | Data | Results | Run / plot |
 |---|---|---|---|
-| Fig. 1 prediction | `data/dpc_experiments/01_prediction_v2` (README) | `evaluation/01_prediction/prediction_results_random.json` | `evaluation/01_prediction/prediction_error_eval.py` (settings in the header of `visualize_prediction_errors.py`); `visualize_prediction_errors.py <results.json>` |
+| Fig. 1 prediction | `data/dpc_experiments/01_prediction_v2` (README) | `evaluation/01_prediction/prediction_results_random.json` (T_ini 10), `..._tini5.json` (T_ini 5) | `evaluation/01_prediction/prediction_error_eval.py` (settings in the header of `visualize_prediction_errors.py`, `PRED_TINI`); `visualize_prediction_errors.py <results.json>`; grip use of the datasets: `grip_usage.py` |
 | Fig. 2 tracking, Fig. 3 implied friction, Table I | `data/dpc_experiments/02_tracking_v2` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh`; `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
 | Nürburgring (Table I) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled` |
 | Infeasible reference (Sec. IV-D) | same | `evaluation/02_tracking/results/infeasible_reference` | `evaluation/02_tracking/run_infeasible_reference.sh`; `infeasible_reference.py` |
-| Fig. 4, Table II hardware | `data/dpc_experiments/04_hardware` (README) | `evaluation/04_hardware/hardware_runs.json` | lab runs; `extract_lab_runs.py <workspace>`; `evaluation/04_hardware/plot_hardware.py` |
+| Fig. 4, Table II hardware | `data/dpc_experiments/04_hardware` (README; data, run configs and logs) | `evaluation/04_hardware/hardware_runs.json` | `evaluation/04_hardware/extract_lab_runs.py`; `evaluation/04_hardware/plot_hardware.py` |
 
 "matched" / "mismatched" = the oracle / inverse runs (DPC_ORACLE=1 / inverse: sampling restricted to the dataset of the true /
 the other friction). NMPC baseline: Pacejka parameters and g-g limits in `external/nmpc/Config/RoboRacer-Multibody` (midpoint
