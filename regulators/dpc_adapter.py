@@ -16,7 +16,7 @@ class DPCAdapter:
         config_dir = os.path.join(os.path.dirname(experiment.__file__), "config")
 
         data_dir = os.path.join(
-            os.getcwd(), os.environ.get("DPC_DATA_DIR", "data/dpc_experiments/02_tracking"))
+            os.getcwd(), os.environ.get("DPC_DATA_DIR", "data/dpc_experiments/02_tracking_v2"))
 
         print(f"Loading Hydra config from: {config_dir}")
         print(f"Using data directory: {data_dir}")
@@ -29,8 +29,10 @@ class DPCAdapter:
                     f"dataset.path={data_dir}",
                     # use the cached merged dataset the simulation results were made with
                     "++dataset.reuse_cached_merge=true",
-                    # e.g. DPC_HYDRA_OVERRIDES="controller.lambda_g=10.0"
-                    *filter(None, os.environ.get("DPC_HYDRA_OVERRIDES", "").split(",")),
+                    # e.g. DPC_HYDRA_OVERRIDES="controller.lambda_g=10.0"; separated by ';' if one is present (then values
+                    # may contain commas, e.g. matrices), else by ','
+                    *filter(None, os.environ.get("DPC_HYDRA_OVERRIDES", "").split(
+                        ";" if ";" in os.environ.get("DPC_HYDRA_OVERRIDES", "") else ",")),
                 ]
             )
 
@@ -90,7 +92,15 @@ class DPCAdapter:
 
         dt = 1.0 / float(self.cfg.experiment.control_freq_hz)
 
-        s_future = s0 + np.cumsum(np.ones(pred_h) * abs(v) * dt)
+        if os.environ.get("DPC_REF_SPACING", "current") == "profile":
+            # reference points spaced by the profile speed (the lab node's reference_spacing: profile)
+            s_future = np.empty(pred_h)
+            s_k = s0
+            for i in range(pred_h):
+                s_k = s_k + max(float(np.interp(np.mod(s_k, self._progress[-1]), self._progress, self._ref_speed)), 0.1) * dt
+                s_future[i] = s_k
+        else:
+            s_future = s0 + np.cumsum(np.ones(pred_h) * abs(v) * dt)
 
         track_len = self._progress[-1]
         s_future = np.mod(s_future, track_len)

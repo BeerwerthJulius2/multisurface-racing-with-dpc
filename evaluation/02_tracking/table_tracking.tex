@@ -1,0 +1,19 @@
+\begin{table}[!t]
+\caption{Closed-loop tracking and prediction error in cm (mean over 30 laps; best per column in bold).}
+\label{tab:tracking}
+\centering
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{l cccc ccc c}
+\hline
+ & \multicolumn{4}{c}{Tracking error} & \multicolumn{3}{c}{Prediction error} & Nürburgring \\
+ & \multicolumn{3}{c}{zone $\mu$} & & \multicolumn{3}{c}{zone $\mu$} & tracking \\
+\cline{2-4}\cline{6-8}
+ & 0.5 & 0.8 & 1.1 & lap & 0.5 & 0.8 & 1.1 & lap \\
+\hline
+DPC pooled & 12.1 & 15.4 & 14.0 & \textbf{13.7} & 3.5 & 8.5 & 4.8 & 8.8 \\
+DPC matched & 14.5 & 16.0 & 13.0 & 14.4 & \textbf{3.0} & \textbf{8.2} & \textbf{4.0} & -- \\
+DPC mismatched & \textbf{11.6} & 14.8 & 19.2 & 15.0 & 6.1 & 8.6 & 8.6 & -- \\
+NMPC & 19.3 & \textbf{14.6} & \textbf{12.1} & 15.6 & -- & -- & -- & 8.4 \\
+\hline
+\end{tabular}
+\end{table}

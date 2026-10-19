@@ -12,6 +12,8 @@ from regulators.path_follow_mpc import *
 from models.extended_kinematic import ExtendedKinematicModel
 from models.dynamic import DynamicBicycleModel
 from helpers.closest_point import *
+from helpers.applied_accel import install as install_applied_accel
+from helpers.implied_friction import implied_friction
 from helpers.rendering_utils import DrawDebug, VehicleImageOverlay, VideoRecorder, set_background_color
 import numpy as np
 
@@ -145,7 +147,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     video_fps = 25
     video_capture_every = 2
 
-    # Optional environment overrides, used by the diagnostics in evaluation/exploratory.
+    # Optional environment overrides, used by the evaluation scripts in evaluation/.
     # Without them the defaults above are unchanged.
     map_name = os.environ.get('DPC_MAP_NAME', map_name)
     if 'DPC_USE_DYN_FRICTION' in os.environ:
@@ -160,12 +162,19 @@ def main():  # after launching this you can run visualization.py to see the resu
     # measurement noise on x, y, v, yaw; 1.0 = 5 cm, 5 cm/s, 0.01 rad (the experiment config's noise block)
     max_sim_time = float(os.environ.get('DPC_MAX_TIME', 'inf'))  # end runs that stop making progress
     abort_tracking_error = float(os.environ.get('DPC_ABORT_ERROR', 'inf'))  # end runs that leave the track
-    oracle = os.environ.get('DPC_ORACLE', '0') == '1'  # sample only from the dataset of the true friction (0.5 / 1.1)
+    # DPC_ORACLE=1: sample only from the dataset of the true friction (0.5 / 1.1); DPC_ORACLE=inverse: only from the other one
+    oracle_mode = os.environ.get('DPC_ORACLE', '0')
+    oracle = oracle_mode in ('1', 'inverse')
+    if 'DPC_SEED' in os.environ:  # measurement noise, for repeated runs
+        np.random.seed(int(os.environ['DPC_SEED']))
     if os.environ.get('DPC_NO_LIDAR', '0') == '1':  # the scan is unused by the controllers; also disables collisions
         from f110_gym.envs.base_classes import RaceCar
         RaceCar.get_current_scan = lambda self: np.full(self.num_beams, 100.0)
     measurement_noise_std = float(os.environ.get('DPC_MEAS_NOISE', 0.0)) * np.array([0.05, 0.05, 0.05, 0.01, 0.0, 0.0, 0.0])
     headless = os.environ.get('DPC_HEADLESS', '0') == '1'  # skip rendering for batch runs
+    log_implied_friction = os.environ.get('DPC_IMPLIED_FRICTION', '0') == '1'  # prediction-based implied friction (evaluation)
+
+    install_applied_accel()  # RaceCar.accel = the acceleration the car receives (logged as the DPC data input)
 
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
@@ -302,6 +311,11 @@ def main():  # after launching this you can run visualization.py to see the resu
         'data_fraction': [],
         'unique_labels': [],
         'pred_xy': [],  # planned positions over the horizon, for the prediction (promise) gap
+        'implied_mu': [],  # prediction-based implied friction (helpers/implied_friction.py), with DPC_IMPLIED_FRICTION=1
+        'implied_dist': [],  # distance between the mu 0.5-only and mu 1.1-only predictions [m]
+        'implied_fit': [],  # relative residual of the mix
+        'implied_d_low': [],  # distance of the pooled prediction to the mu 0.5-only one [m]
+        'implied_d_high': [],  # ... and to the mu 1.1-only one [m]
     }
 
     # calc number of sim steps per one control step
@@ -320,6 +334,17 @@ def main():  # after launching this you can run visualization.py to see the resu
                                   env.sim.agents[0].state[5],  # yaw rate
                                   env.sim.agents[0].state[2],  # steering angle
                                   ]) + np.random.randn(7) * np.maximum(0.00001, measurement_noise_std)
+        # Window convention of the data (DPC_collect_data.py logs each input with the state it leads to): the outputs
+        # end with the current state, the inputs with the last applied input (appended after the plan, below).
+        initial_outputs.append(vehicle_state[:4])
+
+        # set correct friction to the environment (for the coming step; before the controller so the oracle sees it)
+        if use_dyn_friction:
+            min_id = get_closest_point_vectorized(np.array([obs['poses_x'][0], obs['poses_y'][0]]), np.array(tpamap))
+            constant_friction = tpadata[str(min_id)][0]
+
+        env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
+        env.params['tire_p_dx1'] = constant_friction  # mu_x
 
         meta = {
             "usage_fraction": None,
@@ -382,27 +407,19 @@ def main():  # after launching this you can run visualization.py to see the resu
                 u[0] = 8.0 * error_drive
             else:
                 if oracle:  # dataset labels: 0 = mu 0.5, 1 = mu 1.1; in between (0.8) unrestricted
-                    planner_dpc.data.oracle_label = 0 if constant_friction < 0.65 else 1 if constant_friction > 0.95 else None
+                    label = 0 if constant_friction < 0.65 else 1 if constant_friction > 0.95 else None
+                    planner_dpc.data.oracle_label = 1 - label if oracle_mode == 'inverse' and label is not None else label
                 u, mpc_ref_path_x, mpc_ref_path_y, mpc_pred_x, mpc_pred_y, mpc_ox, mpc_oy, meta = planner_dpc.plan(initial_inputs=initial_inputs,initial_outputs=initial_outputs)
                 meta["pred_xy"] = np.array([mpc_pred_x, mpc_pred_y])
+
+                if log_implied_friction:
+                    meta["implied_mu"], meta["implied_dist"], meta["implied_fit"], meta["implied_d_low"], meta["implied_d_high"] = implied_friction(planner_dpc)
 
                 # draw predicted states and reference trajectory
                 draw.reference_traj_show = np.array([mpc_ref_path_x, mpc_ref_path_y]).T
                 draw.predicted_traj_show = np.array([mpc_pred_x, mpc_pred_y]).T
 
 
-        _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
-                                                                       np.array([waypoints[:, 1], waypoints[:, 2]]).T)
-
-        # print(tracking_error)
-
-        # set correct friction to the environment
-        if use_dyn_friction:
-            min_id = get_closest_point_vectorized(np.array([obs['poses_x'][0], obs['poses_y'][0]]), np.array(tpamap))
-            constant_friction = tpadata[str(min_id)][0]
-
-        env.params['tire_p_dy1'] = constant_friction * 0.9  # mu_y
-        env.params['tire_p_dx1'] = constant_friction  # mu_x
 
         # # print(env.params['tire_p_dx1'])
         # print("%f   %f" % (waypoints[:, 5][n_point], env.sim.agents[0].state[3]))
@@ -447,9 +464,6 @@ def main():  # after launching this you can run visualization.py to see the resu
         # Simulation step
         step_reward = 0.0
 
-        initial_inputs.append(u)
-        initial_outputs.append(vehicle_state[:4])
-
         for i in range(num_of_sim_steps):
             obs, rew, _, info = env.step(np.array([[u[1], u[0]]]))
             step_reward += rew
@@ -461,6 +475,14 @@ def main():  # after launching this you can run visualization.py to see the resu
                 env.render(mode='human_fast')
 
         laptime += step_reward
+
+        # input window: the acceleration the car received (clipped, power limit; helpers/applied_accel.py), as logged in
+        # the data by DPC_collect_data.py, and the commanded steering
+        initial_inputs.append([env.sim.agents[0].accel, u[1]])
+
+        # tracking error, progress and reference speed of the state logged below (after the step)
+        _, tracking_error, _, _, n_point = nearest_point_on_trajectory(np.array([env.sim.agents[0].state[0], env.sim.agents[0].state[1]]),
+                                                                       np.array([waypoints[:, 1], waypoints[:, 2]]).T)
 
         # Logging
         log['time'].append(laptime)
@@ -482,6 +504,11 @@ def main():  # after launching this you can run visualization.py to see the resu
             meta["unique_labels"].tolist() if meta["unique_labels"] is not None else None
         )
         log['pred_xy'].append(meta["pred_xy"].tolist() if meta.get("pred_xy") is not None else None)
+        log['implied_mu'].append(meta.get("implied_mu"))
+        log['implied_dist'].append(meta.get("implied_dist"))
+        log['implied_fit'].append(meta.get("implied_fit"))
+        log['implied_d_low'].append(meta.get("implied_d_low"))
+        log['implied_d_high'].append(meta.get("implied_d_high"))
 
 
 

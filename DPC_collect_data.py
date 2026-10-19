@@ -1,10 +1,12 @@
 import csv
+import os
 import random
 import time
 import yaml
 import gym
 from argparse import Namespace
 from regulators.pure_pursuit import *
+from helpers.applied_accel import install as install_applied_accel
 from regulators.path_follow_mpc import *
 from models.extended_kinematic import ExtendedKinematicModel
 from models.dynamic import DynamicBicycleModel
@@ -161,6 +163,21 @@ def main():  # after launching this you can run visualization.py to see the resu
     start_point = 1  # index on the trajectory to start from
     max_laptime = 10000.0
 
+    # Optional environment overrides (as in DPC.py) for scripted collection; without them the defaults above are unchanged.
+    map_name = os.environ.get('DPC_MAP_NAME', map_name)
+    if 'DPC_USE_DYN_FRICTION' in os.environ:
+        use_dyn_friction = os.environ['DPC_USE_DYN_FRICTION'] == '1'
+    constant_friction = float(os.environ.get('DPC_CONSTANT_FRICTION', constant_friction))
+    number_of_laps = int(os.environ.get('DPC_NUMBER_OF_LAPS', number_of_laps))
+    # DPC_SPEED_RAMP="start,step": velocity multiplier start + step * completed laps (the recorded datasets used 0.5,0.1)
+    speed_ramp = [float(v) for v in os.environ['DPC_SPEED_RAMP'].split(',')] if 'DPC_SPEED_RAMP' in os.environ else None
+    # DPC_SPEED_LAPS="0.5,0.6,...,1.05": velocity multiplier per lap (the last one repeats); overrides DPC_SPEED_RAMP
+    speed_laps = [float(v) for v in os.environ['DPC_SPEED_LAPS'].split(',')] if 'DPC_SPEED_LAPS' in os.environ else None
+    data_suffix = os.environ.get('DPC_DATA_SUFFIX', '')
+    abort_tracking_error = float(os.environ.get('DPC_ABORT_ERROR', 'inf'))  # end runs that leave the track (as in DPC.py)
+
+    install_applied_accel()  # RaceCar.accel = the acceleration the car receives (logged as the DPC data input)
+
     ekin_config = MPCConfigEXT()
     dyn_config = MPCConfigDYN()
     # ekin_config.DTK = kin_config.DTK = dyn_config.DTK = control_step / 1000.0
@@ -273,6 +290,10 @@ def main():  # after launching this you can run visualization.py to see the resu
     print('Model used: %s' % model_to_use)
     while not done:
         #velocity_profile_multiplier = (0.5 + 0.1 * obs['lap_counts'][0])
+        if speed_laps is not None:
+            velocity_profile_multiplier = speed_laps[min(int(obs['lap_counts'][0]), len(speed_laps) - 1)]
+        elif speed_ramp is not None:
+            velocity_profile_multiplier = speed_ramp[0] + speed_ramp[1] * obs['lap_counts'][0]
         #print(velocity_profile_multiplier)
         waypoints[:, 5] = velocity_profile*velocity_profile_multiplier
         # Regulator step MPC
@@ -429,7 +450,7 @@ def main():  # after launching this you can run visualization.py to see the resu
 
 
 
-        if obs['lap_counts'][0] == number_of_laps or laptime > max_laptime:  # or env.sim.agents[0].state[3] < 0.4 or tracking_error > 10.0:
+        if obs['lap_counts'][0] == number_of_laps or laptime > max_laptime or tracking_error > abort_tracking_error:  # or env.sim.agents[0].state[3] < 0.4
             done = 1
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
@@ -439,7 +460,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     log_nmpc_array = np.array(log_nmpc, dtype=np.float64)
 
     # Save CSV
-    with open(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}.csv', 'w', newline='') as f:
+    with open(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}{data_suffix}.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["t", "agent_id", "accel", "steering", "x", "y", "v", "yaw"])
         writer.writerows(log_dpc_array)
@@ -450,7 +471,7 @@ def main():  # after launching this you can run visualization.py to see the resu
     #     writer.writerows(log_nmpc_array)
 
     # Save NumPy
-    np.save(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}.npy', log_dpc_array)
+    np.save(f'data/dpc_experiments/inputs_outputs_{model_to_use}_{constant_friction}{data_suffix}.npy', log_dpc_array)
     # np.save(f'data/dpc_experiments/nmpc_data_{model_to_use}_{constant_friction}.npy', log_nmpc_array)
 
 
