@@ -4,6 +4,7 @@
 [submodule "external/nmpc"]
 	path = external/nmpc
 	url = git@github.com:BeerwerthJulius2/TUM-CONTROL-with-DPC.git
+	ignore = untracked
 [submodule "paper"]
 	path = paper
 	url = https://git@git.overleaf.com/692d6b124ccd276a101c3233
