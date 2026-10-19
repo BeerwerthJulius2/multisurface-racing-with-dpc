@@ -1,0 +1,226 @@
+controller:
+  simulation_freq_hz: ${experiment.simulation_freq_hz}
+  control_freq_hz: ${experiment.control_freq_hz}
+  num_traj: 100
+  lambda_g: 300
+  lambda_sigma: 10
+  initialization_horizon: 10
+  prediction_horizon: 20
+  dataset:
+    path: /home/julius/dev/ros2-workspace-lab-dpc/src/dpc-controller/data/vehicle_1
+    merge_data: true
+    alignment:
+      enabled: true
+      method: pose
+    normalization:
+      enabled: true
+      method: z_score
+    online_trajectory_update:
+      enabled: false
+      method: append
+  preprocess:
+    controller_configs:
+    - num_inputs
+    - num_outputs
+    - prediction_horizon
+    - initialization_horizon
+    - normalization
+    - alignment
+    - control_affine
+    remove_duplicates: false
+    filter_data: false
+    stride: 3
+    acceleration_filter:
+      enabled: false
+      threshold: 0.5
+      metric: max
+      threshold_type: lower
+      keep_extremes: false
+      per_dimension: false
+  path_sampling:
+    online_sampling: true
+    sampling: contextual
+    distribution:
+      name: gaussian
+      params:
+        reference_score: 0.04
+    percentile_scale: 6
+    clip_lower: 1.0
+    clip_upper: 90.0
+    sampling_debug: true
+    visualize_once: true
+    oracle_labels:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+  log_data: true
+  log_matrices: false
+  input_slack: true
+  safety_stop:
+    max_lateral_error: 0.3
+    max_heading_error_deg: 45.0
+  r_k:
+  - - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+  r_dk:
+  - - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+  q_k:
+  - - 1000.0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 1000.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 300.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 300.0
+  q_fk:
+  - - 1000.0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 1000.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 300.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 300.0
+  num_inputs: 2
+  num_outputs: 4
+  input_names:
+  - accl
+  - delta
+  output_names:
+  - pose_x
+  - pose_y
+  - linear_vel_x
+  - pose_theta
+  u_min:
+  - -1.0
+  - -1.0
+  u_max:
+  - 1.0
+  - 1.0
+  y_min:
+  - -1000000000.0
+  - -1000000000.0
+  - -5.0
+  - -10
+  y_max:
+  - 1000000000.0
+  - 1000000000.0
+  - 5.0
+  - 10
+  action_interface:
+    steering_mode: delta_to_steerv
+    dt: 0.02
+    steerv_min: -7.5
+    steerv_max: 7.5
+  debug_plot:
+    enabled: false
+    blocking: false
+    raw: true
+  debug_LQR: false
+  debug_matrix_rank: false
+  debug_plot_mae: false
+  reference_mode: spatial
+  plan_fallback: true
+  reference_source: raceline
+  raceline_file: raceline/figure8_lat1.8.csv
+  raceline_a_lat: 1.8
+  reference_spacing: profile
+  raceline_speed_gain: 1.1
+  start_delay: 2.0
+  lambda_sigma_launch: 10.0
+  launch_speed: 0.5
+  launch_pure_pursuit_s: 1.0
+evaluation:
+  enabled: true
+  discard_first: 10
+  reference_alignment: next
+  save_stats: false
+  plot_trajectories: false
+logging:
+  log_root: logs
+  level: INFO
+  console_level: WARNING
+  topics:
+  - experiment
+  - controller
+  - simulation
+  - reference
+  - datalogger
+reference:
+  dlk: 2.0
+  control_freq_hz: ${experiment.control_freq_hz}
+  max_speed: ${controller.y_max[2]}
+scenario:
+  track:
+    name: Custom
+    root: vehicle/scenario
+    start_idx: 0
+  max_speed: ${reference.max_speed}
+simulation:
+  backend: f1tenth_multibody
+  simulation_freq_hz: ${experiment.simulation_freq_hz}
+  control_freq_hz: ${experiment.control_freq_hz}
+  renderer_zoom_level: 13.0
+  renderer_hud_scale: 1.0
+  renderer_hud_margin: 20.0
+  friction:
+    mu: 1.1
+    dynamic: false
+  renderer_follow_vehicle: true
+  render_mode: human_fast
+experiment:
+  _target_: vehicle.experiment.dpc.VehicleDPCEval
+  name: VehicleDPCEval
+  duration_sec: 60
+  simulation_freq_hz: null
+  control_freq_hz: 50
+  excitation:
+    enabled: false
+    accel_sigma: 0.0
+    steer_sigma: 0.0
+  load_data: true
+  allow_no_data: false
+save_outputs: true
+seed: 31415
+progress_bar:
+  value: true
+  time_interval_s: 20
+  bar_width: 50
+dataset:
+  path: /home/julius/dev/ros2-workspace-lab-dpc/src/dpc-controller/data/vehicle_1
+  merge_data: true
+  alignment:
+    enabled: true
+    method: pose
+  normalization:
+    enabled: true
+    method: z_score
+  online_trajectory_update:
+    enabled: false
+    method: append
