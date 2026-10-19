@@ -46,6 +46,17 @@ This repository is using multi-body full scale car version of the [F1/10 gym](ht
 * visualization_dpc.py: paper figures from the evaluation logs.
 
 ## Citing
+If you use the DPC code or data, please cite:
+
+```
+@unpublished{beerwerth2026datadriven,
+  title={Data-Driven Predictive Control for Autonomous Racing under Varying Friction},
+  author={Beerwerth, Julius and Tischbein, Julius and Alrifaee, Bassam},
+  note={Manuscript in preparation},
+  year={2026}
+}
+```
+
 If you find this Controller useful, please consider citing:
 
 ```
