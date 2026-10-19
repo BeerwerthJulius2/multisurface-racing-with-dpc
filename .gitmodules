@@ -4,3 +4,4 @@
 [submodule "external/nmpc"]
 	path = external/nmpc
 	url = git@github.com:BeerwerthJulius2/TUM-CONTROL-with-DPC.git
+	ignore = untracked
