@@ -5,3 +5,8 @@
 	path = external/nmpc
 	url = git@github.com:BeerwerthJulius2/TUM-CONTROL-with-DPC.git
 	ignore = untracked
+[submodule "external/f1tenth_gym"]
+	path = external/f1tenth_gym
+	url = https://github.com/atomyks/f1tenth_gym.git
+	branch = multibody
+	ignore = untracked

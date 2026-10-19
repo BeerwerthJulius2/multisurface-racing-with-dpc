@@ -7,9 +7,9 @@ diagnostics are on branch `archive/full-2026-10`.
 
 Setup (Python 3.8):
 ```
-git submodule update --init external/dpc external/nmpc
+git submodule update --init external/dpc external/nmpc external/f1tenth_gym
 python3.8 -m venv .venv && .venv/bin/pip install "pip<24.1" && .venv/bin/pip install -r evaluation/requirements.txt
-.venv/bin/pip install -e <f1tenth_gym, branch multibody, e55925e> -e <acados v0.5.4>/interfaces/acados_template
+.venv/bin/pip install -e external/f1tenth_gym -e <acados v0.5.4>/interfaces/acados_template
 ```
 acados is built in `~/dev/acados` (else set `ACADOS_SOURCE_DIR`, `LD_LIBRARY_PATH`). All commands from the repository root.
 
@@ -27,7 +27,8 @@ of the mu 0.5 and 1.1 fits; excitation data from `NMPC_collect_data.py` in `data
 `models/fit_nmpc_parameters.py`). Numbers for the text: `evaluation/PAPER_NOTES.md`; figure style: `helpers/paper_style.py`.
 
 ## Simulator
-This repository is using multi-body full scale car version of the [F1/10 gym](https://github.com/atomyks/f1tenth_gym/tree/multibody).
+This repository is using multi-body full scale car version of the [F1/10 gym](https://github.com/atomyks/f1tenth_gym/tree/multibody)
+(submodule `external/f1tenth_gym`, branch multibody, e55925e).
 
 ## Entry points
 * GP_MPC.py

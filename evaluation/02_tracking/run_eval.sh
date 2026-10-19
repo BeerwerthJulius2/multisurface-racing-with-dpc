@@ -3,7 +3,7 @@
 # usage: evaluation/02_tracking/run_eval.sh [map] [seeds] [arms]   (from the repository root; default: l_shape "1 2 3"
 #        "pooled oracle inverse"; the paper uses l_shape with all arms and Nuerburgring with pooled). RUN_NMPC=0: DPC only.
 #
-# Environment: python 3.8 venv in .venv (gym 0.19, f1tenth_gym multibody branch, numpy 1.22, cvxpy 1.5, osqp 1.1, hydra 1.3,
+# Environment: python 3.8 venv in .venv (gym 0.19, f1tenth_gym = external/f1tenth_gym, numpy 1.22, cvxpy 1.5, osqp 1.1, hydra 1.3,
 # casadi 3.6.7, torch cpu), acados v0.5.4 built in ~/dev/acados (ACADOS_SOURCE_DIR, LD_LIBRARY_PATH below).
 # Data: data/dpc_experiments/02_tracking_v2 (see its README). Logs: evaluation/02_tracking/results/
 # log_dpc_eval_<map>_eval_<arm>_s<seed>, log_nmpc_eval_<map>_s<seed> (overwrites the committed results; compare with git diff).
