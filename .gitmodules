@@ -1,6 +1,7 @@
 [submodule "external/dpc"]
 	path = external/dpc
-	url = git@git.rwth-aachen.de:CPM/Project/julius/software/deepc.git
+	url = https://github.com/bassamlab/Contextual-DPC.git
+	branch = ecc2027
 [submodule "external/nmpc"]
 	path = external/nmpc
 	url = https://github.com/BeerwerthJulius2/TUM-CONTROL-with-DPC.git
