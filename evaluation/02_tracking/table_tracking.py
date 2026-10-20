@@ -57,7 +57,7 @@ for a in arms:
     nbr = "%.1f" % (100 * np.nanmean(N[a])) if a in N else "--"
     rows.append(f"{names[a]} & " + " & ".join(cells[:4]) + " & " + " & ".join(cells[4:]) + f" & {nbr} \\\\")
 tex = r"""\begin{table}[!t]
-\caption{Closed-loop tracking and prediction error in cm (mean over 30 laps; best per column in bold).}
+\caption{Closed-loop tracking and prediction error in cm (30 laps; tracking: median per track position, averaged over the zone; prediction: median over the zone's steps; best per column in bold).}
 \label{tab:tracking}
 \centering
 \setlength{\tabcolsep}{3.2pt}

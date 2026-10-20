@@ -9,5 +9,5 @@ tire_p_dy1 = 0.9 mu, as in the multi-friction simulation):
         seed=31415 experiment.duration_sec=1000 hydra.run.dir=<output folder>
 
 The random policy (experiment.random_policy in the stored .hydra/config.yaml) redraws steering and speed targets every 100
-steps. Same protocol as the earlier mu 0.3 / 0.7 / 1.0 data in ../01_prediction, at the friction values of the closed-loop
+steps. Same protocol as the earlier mu 0.3 / 0.7 / 1.0 data in ../01_prediction (branch archive/full-2026-10), at the friction values of the closed-loop
 evaluation. The logger's time column `t` is coarse (it advances every 100 rows); the dataset loader does not use it.

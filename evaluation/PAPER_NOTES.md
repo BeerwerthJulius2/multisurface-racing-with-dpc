@@ -23,7 +23,7 @@ Numbers for the text (cm unless stated):
   own regime (1'g) is only 0.65 (T_ini 5) / 0.73 (T_ini 10); lambda_sigma x100 or 1000 columns help little, T_ini 20 not more.
   Grip use (share of samples above 70% of mu g, `01_prediction/grip_usage.py`): random 68% (mu 0.5) / 57% (mu 1.1), raceline
   6% (mu 0.5) / 0% (mu 1.1).
-  The earlier random data in 01_prediction (labelled mu 0.3 / 1.0; their stored configs all say mu 1.1, so the friction is
+  The earlier random data in 01_prediction (branch archive/full-2026-10; labelled mu 0.3 / 1.0; their stored configs all say mu 1.1, so the friction is
   undocumented) separate by speed (median 29.6 vs 13.8 m/s): weight on the own regime 0.99 / 0.93; pooled 17.6 / 18.4, matched
   13.2 / 17.2, mismatched 58.7 / 63.0 (T_ini 5).
 - Open item: closed-loop simulation with T_ini 10 (currently 5), to be run.
@@ -46,6 +46,8 @@ Numbers for the text (cm unless stated):
   mismatched all leave the track in the first corner (50 / 54 / 68 m); prediction error before that (median, first 60 m) 52 / 34 /
   50 cm. At x1.0 all complete (2.8 / 2.4 / 5.4 cm); at mu 1.1 the x1.1 profile is completed by all (4.7 / 3.1 / 9.3 cm).
 - Nürburgring (lap): pooled 8.8, NMPC 8.4; largest DPC deviation at the hairpin (curvature 0.091 1/m, twice the L-shape data).
+- Uncapped Nürburgring (Sec. IV-D; `VMAX=100 RUN_NMPC=0 evaluation/02_tracking/run_eval.sh Nuerburgring 1 pooled`): the profile
+  starts at 35.0 m/s and 68% of it lies above the data's 20.5 m/s; the first DPC solve fails (OSQP SolverError).
 - Hardware, slippery tyres: lateral pooled 2.0 (1.5-2.2 over the 3 runs), matched 1.9 (1.5-2.2), mismatched 4.0 (2.9-4.7);
   prediction (rms, 20 steps) 1.28 / 1.27 / 2.62; lap 9.62 / 9.51 / 9.30 s. Normal tyres: lateral 1.3 (1.0-1.6) / 1.5 (1.3-1.6) /
   1.0 (0.9-1.2), prediction 0.90 / 0.85 / 1.19, lap 10.17 / 9.84 / 10.35 s

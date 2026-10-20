@@ -12,13 +12,17 @@ python3.8 -m venv .venv && .venv/bin/pip install "pip<24.1" && .venv/bin/pip ins
 .venv/bin/pip install -e external/f1tenth_gym -e <acados v0.5.4>/interfaces/acados_template
 ```
 acados is built in `~/dev/acados` (else set `ACADOS_SOURCE_DIR`, `LD_LIBRARY_PATH`). All commands from the repository root.
+The runs are deterministic: on the machine that produced the committed logs they reproduce bit for bit. On other hardware,
+floating-point differences of about 1e-7 at the first solve grow along the closed loop (millimetres to a few centimetres); the
+statements of the paper are unaffected.
 
 | Paper | Data | Results | Run / plot |
 |---|---|---|---|
-| Fig. 1 prediction | `data/dpc_experiments/01_prediction_v2` (README) | `evaluation/01_prediction/prediction_results_random.json` (T_ini 10), `..._tini5.json` (T_ini 5) | `evaluation/01_prediction/prediction_error_eval.py` (settings in the header of `visualize_prediction_errors.py`, `PRED_TINI`); `visualize_prediction_errors.py <results.json>`; grip use of the datasets: `grip_usage.py` |
+| Fig. 1 prediction | `data/dpc_experiments/01_prediction_v2` (README) | `evaluation/01_prediction/prediction_results_random.json` (T_ini 10), `..._tini5.json` (T_ini 5) | `evaluation/01_prediction/prediction_error_eval.py` (settings in the header of `visualize_prediction_errors.py`; T_ini 5: the same with `PRED_TINI=5 PRED_OUT=evaluation/01_prediction/prediction_results_random_tini5.json`); `visualize_prediction_errors.py <results.json>`; grip use of the datasets: `grip_usage.py` |
 | Fig. 2 tracking, Fig. 3 implied friction, Table I | `data/dpc_experiments/02_tracking_v2` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh`; `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
 | Nürburgring (Table I) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled` |
-| Infeasible reference (Sec. IV-D) | same | `evaluation/02_tracking/results/infeasible_reference` | `evaluation/02_tracking/run_infeasible_reference.sh`; `infeasible_reference.py` |
+| Uncapped Nürburgring (Sec. IV-D) | same | `evaluation/PAPER_NOTES.md` | `VMAX=100 RUN_NMPC=0 run_eval.sh Nuerburgring 1 pooled` (stops at the first solve) |
+| Infeasible reference (supplementary, not in the paper) | same | `evaluation/02_tracking/results/infeasible_reference` | `evaluation/02_tracking/run_infeasible_reference.sh`; `infeasible_reference.py` |
 | Fig. 4, Table II hardware | `data/dpc_experiments/04_hardware` (README; data, run configs and logs) | `evaluation/04_hardware/hardware_runs.json` | `evaluation/04_hardware/extract_lab_runs.py`; `evaluation/04_hardware/plot_hardware.py` |
 
 "matched" / "mismatched" = the oracle / inverse runs (DPC_ORACLE=1 / inverse: sampling restricted to the dataset of the true /

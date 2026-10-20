@@ -8,7 +8,7 @@ training columns by one window length (Hankel columns overlap), evaluated on the
 usage (repo root, the sim venv): python evaluation/01_prediction/prediction_error_eval.py [n windows per surface (0 = all)]
 -> evaluation/01_prediction/prediction_results.json, then visualize_prediction_errors.py.
 Other data: PRED_DATA (data folder), PRED_LABELS (dataset label:name of the two regimes, e.g. "0:mu_03,2:mu_10" for the random
-excitation data in data/dpc_experiments/01_prediction, whose labels are 0 / 1 / 2 = mu 0.3 / 0.7 / 1.0), PRED_OUT (result file),
+excitation data in data/dpc_experiments/01_prediction on branch archive/full-2026-10, whose labels are 0 / 1 / 2 = mu 0.3 / 0.7 / 1.0), PRED_OUT (result file),
 PRED_KEYS (comma-separated subset of the settings), PRED_TINI (initialization horizon, default 5), PRED_CACHE=0 to merge the data afresh instead of reusing the cached merge."""
 import json, os, sys, time
 from copy import copy

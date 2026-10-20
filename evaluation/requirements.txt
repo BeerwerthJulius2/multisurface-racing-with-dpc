@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 antlr4-python3-runtime==4.9.3
 casadi==3.6.7
 clarabel==0.9.0

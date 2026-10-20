@@ -2,6 +2,7 @@
 # Tracking evaluation of the multisurface DPC (pooled / oracle / inverse oracle) and the NMPC baseline, as run on 2026-10-15.
 # usage: evaluation/02_tracking/run_eval.sh [map] [seeds] [arms]   (from the repository root; default: l_shape "1 2 3"
 #        "pooled oracle inverse"; the paper uses l_shape with all arms and Nuerburgring with pooled). RUN_NMPC=0: DPC only.
+#        VMAX: speed cap of the reference profile in m/s (default 20; VMAX=100 = uncapped, Sec. IV-D).
 #
 # Environment: python 3.8 venv in .venv (gym 0.19, f1tenth_gym = external/f1tenth_gym, numpy 1.22, cvxpy 1.5, osqp 1.1, hydra 1.3,
 # casadi 3.6.7, torch cpu), acados v0.5.4 built in ~/dev/acados (ACADOS_SOURCE_DIR, LD_LIBRARY_PATH below).
@@ -16,7 +17,7 @@ OUT=evaluation/02_tracking/results
 cd "$(dirname "$0")/../.."
 export PYTHONPATH=$PWD/external/dpc:$PWD/external/nmpc
 export ACADOS_SOURCE_DIR=${ACADOS_SOURCE_DIR:-$HOME/dev/acados} LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-$HOME/dev/acados/lib}
-COMMON="DPC_MAP_NAME=$MAP DPC_NUMBER_OF_LAPS=$LAPS DPC_VELOCITY_MAX=20 DPC_ABORT_ERROR=5"
+COMMON="DPC_MAP_NAME=$MAP DPC_NUMBER_OF_LAPS=$LAPS DPC_VELOCITY_MAX=${VMAX:-20} DPC_ABORT_ERROR=5"
 # DPC setting tuned for pooled tracking: deepc controller config multisurface_sim (lambda_g 5, lambda_sigma 50, speed weight 300);
 # reference spaced by the profile speed
 DPC="DPC_HEADLESS=1 DPC_DATA_DIR=data/dpc_experiments/02_tracking_v2 DPC_REF_SPACING=profile"
