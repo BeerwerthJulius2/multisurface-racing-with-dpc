@@ -42,9 +42,6 @@ Numbers for the text (cm unless stated):
 - Along the lap vs matched (Fig. 2 bottom): mismatched +0.6, pooled -0.8 (lap mean); mu 1.1 zone up to +20 for mismatched.
 - Implied friction (Fig. 3): 0.77 / 0.88 / 0.90 in the mu 0.5 / 0.8 / 1.1 zones; readable (two predictions > 1 cm apart) on 99% of
   the lap; on the 20% of the lap where they differ most (> 6.5 cm) 0.77 / 0.89 / 0.96.
-- Infeasible reference (`run_infeasible_reference.sh`, constant mu, 2 laps): speed profile x1.1 at mu 0.5: pooled, matched and
-  mismatched all leave the track in the first corner (50 / 54 / 68 m); prediction error before that (median, first 60 m) 52 / 34 /
-  50 cm. At x1.0 all complete (2.8 / 2.4 / 5.4 cm); at mu 1.1 the x1.1 profile is completed by all (4.7 / 3.1 / 9.3 cm).
 - Nürburgring (lap): pooled 8.8, NMPC 8.4; largest DPC deviation at the hairpin (curvature 0.091 1/m, twice the L-shape data).
 - Uncapped Nürburgring (Sec. IV-D; `VMAX=100 RUN_NMPC=0 evaluation/02_tracking/run_eval.sh Nuerburgring 1 pooled`): the profile
   starts at 35.0 m/s and 68% of it lies above the data's 20.5 m/s; the first DPC solve fails (OSQP SolverError).

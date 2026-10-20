@@ -22,7 +22,6 @@ statements of the paper are unaffected.
 | Fig. 2 tracking, Fig. 3 implied friction, Table I | `data/dpc_experiments/02_tracking_v2` (README) | `evaluation/02_tracking/results` | `evaluation/02_tracking/run_eval.sh`; `visualization_dpc.py l_shape`; `evaluation/02_tracking/table_tracking.py` |
 | Nürburgring (Table I) | same | same | `run_eval.sh Nuerburgring "1 2 3" pooled` |
 | Uncapped Nürburgring (Sec. IV-D) | same | `evaluation/PAPER_NOTES.md` | `VMAX=100 RUN_NMPC=0 run_eval.sh Nuerburgring 1 pooled` (stops at the first solve) |
-| Infeasible reference (supplementary, not in the paper) | same | `evaluation/02_tracking/results/infeasible_reference` | `evaluation/02_tracking/run_infeasible_reference.sh`; `infeasible_reference.py` |
 | Fig. 4, Table II hardware | `data/dpc_experiments/04_hardware` (README; data, run configs and logs) | `evaluation/04_hardware/hardware_runs.json` | `evaluation/04_hardware/extract_lab_runs.py`; `evaluation/04_hardware/plot_hardware.py` |
 
 "matched" / "mismatched" = the oracle / inverse runs (DPC_ORACLE=1 / inverse: sampling restricted to the dataset of the true /

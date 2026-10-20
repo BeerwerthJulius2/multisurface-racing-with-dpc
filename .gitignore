@@ -53,7 +53,6 @@ evaluation/exploratory/segment_sampling/logs/
 log_nmpc_eval_*
 # ... except the paper's results (evaluation/02_tracking/run_eval.sh)
 !evaluation/02_tracking/results/log_*_eval_*
-!evaluation/02_tracking/results/infeasible_reference/log_*
 acados_ocp_*.json
 gp*.pth
 log01
