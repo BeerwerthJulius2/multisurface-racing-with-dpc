@@ -25,7 +25,7 @@ def along(t, a):
     med = np.array([np.median(x) if x else np.nan for x in v]); k = 4
     return np.array([np.nanmean(med[np.arange(i - k // 2, i - k // 2 + k) % nbin]) for i in range(nbin)])
 fig, axes = plt.subplots(2, 1, sharex=True, sharey=True, figsize=(ps.COLUMN_IN, 1.75))
-for ax, (t, name) in zip(axes, (("slippery", "low-friction tires"), ("normal", "standard tires"))):
+for ax, (t, name) in zip(axes, (("slippery", "low-friction tires"), ("normal", "high-friction tires"))):
     m_, w_, p_ = along(t, "oracle"), along(t, "inverse"), along(t, "pooled")
     dw, dp = w_ - m_, p_ - m_
     ax.fill_between(c, 0, dw, color=ps.COLORS["inverse"], alpha=0.3, lw=0, label="DPC mismatched")

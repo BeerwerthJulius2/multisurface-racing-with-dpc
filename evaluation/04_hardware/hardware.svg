@@ -1763,22 +1763,27 @@ L 239.913837 84.258125
 " style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_16">
-    <!-- standard tires -->
+    <!-- high-friction tires -->
     <g transform="translate(27.43 50.790625)scale(0.07 -0.07)">
-     <use xlink:href="#STIXGeneral-Regular-73"/>
-     <use xlink:href="#STIXGeneral-Regular-74" x="38.899994"/>
-     <use xlink:href="#STIXGeneral-Regular-61" x="66.699982"/>
-     <use xlink:href="#STIXGeneral-Regular-6e" x="111.099976"/>
-     <use xlink:href="#STIXGeneral-Regular-64" x="161.09996"/>
-     <use xlink:href="#STIXGeneral-Regular-61" x="211.099945"/>
-     <use xlink:href="#STIXGeneral-Regular-72" x="255.499939"/>
-     <use xlink:href="#STIXGeneral-Regular-64" x="288.799927"/>
-     <use xlink:href="#STIXGeneral-Regular-20" x="338.799911"/>
-     <use xlink:href="#STIXGeneral-Regular-74" x="363.799896"/>
-     <use xlink:href="#STIXGeneral-Regular-69" x="391.599884"/>
-     <use xlink:href="#STIXGeneral-Regular-72" x="419.399872"/>
-     <use xlink:href="#STIXGeneral-Regular-65" x="452.69986"/>
-     <use xlink:href="#STIXGeneral-Regular-73" x="497.099854"/>
+     <use xlink:href="#STIXGeneral-Regular-68"/>
+     <use xlink:href="#STIXGeneral-Regular-69" x="49.999985"/>
+     <use xlink:href="#STIXGeneral-Regular-67" x="77.799973"/>
+     <use xlink:href="#STIXGeneral-Regular-68" x="127.799957"/>
+     <use xlink:href="#STIXGeneral-Regular-2d" x="177.799942"/>
+     <use xlink:href="#STIXGeneral-Regular-66" x="211.09993"/>
+     <use xlink:href="#STIXGeneral-Regular-72" x="244.399918"/>
+     <use xlink:href="#STIXGeneral-Regular-69" x="277.699905"/>
+     <use xlink:href="#STIXGeneral-Regular-63" x="305.499893"/>
+     <use xlink:href="#STIXGeneral-Regular-74" x="349.899887"/>
+     <use xlink:href="#STIXGeneral-Regular-69" x="377.699875"/>
+     <use xlink:href="#STIXGeneral-Regular-6f" x="405.499863"/>
+     <use xlink:href="#STIXGeneral-Regular-6e" x="455.499847"/>
+     <use xlink:href="#STIXGeneral-Regular-20" x="505.499832"/>
+     <use xlink:href="#STIXGeneral-Regular-74" x="530.499817"/>
+     <use xlink:href="#STIXGeneral-Regular-69" x="558.299805"/>
+     <use xlink:href="#STIXGeneral-Regular-72" x="586.099792"/>
+     <use xlink:href="#STIXGeneral-Regular-65" x="619.39978"/>
+     <use xlink:href="#STIXGeneral-Regular-73" x="663.799774"/>
     </g>
    </g>
    <g id="legend_2">
