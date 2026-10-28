@@ -60,7 +60,7 @@ tex = r"""\begin{table}[!t]
 \caption{Closed-loop lateral and prediction error in cm (30 laps; lateral: median per track position, averaged over the zone; prediction: RMS over the horizon, median over the zone's steps; best per column in bold).}
 \label{tab:tracking}
 \centering
-\setlength{\tabcolsep}{3.2pt}
+\setlength{\tabcolsep}{2.9pt}
 \begin{tabular}{l cccc ccc c}
 \hline
  & \multicolumn{4}{c}{Lateral error} & \multicolumn{3}{c}{Prediction error} & Nürburgring \\
