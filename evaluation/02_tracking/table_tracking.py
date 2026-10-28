@@ -62,14 +62,14 @@ tex = r"""\begin{table}[!t]
 \centering
 \setlength{\tabcolsep}{2.9pt}
 \begin{tabular}{l cccc ccc c}
-\hline
+\toprule
  & \multicolumn{4}{c}{Lateral error} & \multicolumn{3}{c}{Prediction error} & Nürburgring \\
  & \multicolumn{3}{c}{zone $\mu$} & & \multicolumn{3}{c}{zone $\mu$} & lateral \\
-\cline{2-4}\cline{6-8}
+\cmidrule(lr){2-4}\cmidrule(lr){6-8}
  & 0.5 & 0.8 & 1.1 & lap & 0.5 & 0.8 & 1.1 & lap \\
-\hline
+\midrule
 """ + "\n".join(rows) + r"""
-\hline
+\bottomrule
 \end{tabular}
 \end{table}
 """
